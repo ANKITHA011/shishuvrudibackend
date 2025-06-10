@@ -1,0 +1,27 @@
+.curve-separator100 {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 63%;
+    z-index: 150;
+    background-color: var(--primary-color);
+    height: 100px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-left: 355px;
+}
+
+.curve-separator5 svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    position: absolute;
+    bottom: 0;
+}
+
+.wave-wave-back5,
+.wave-front5 {
+    fill: var(--primary-color);
+}

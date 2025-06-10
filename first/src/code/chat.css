@@ -1,0 +1,343 @@
+/* Add this to your existing CSS */
+.page-layout {
+    display: flex;
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Main Content Area (Chat Interface) */
+.main-wrapper3 {
+    width: calc(100vw - 220px);
+    height: 100vh;
+    max-width: 100%;
+    background: #ffffff;
+    border-radius: 0 20px 20px 0;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    margin-left: 220px;
+    backdrop-filter: blur(10px);
+    padding-top: 100px; /* Adjusted: Add padding-top equal to the header's height (100px) */
+}
+
+.left-nav1 {
+    width: 220px;
+    background-color: var(--background-light);
+    height: 100vh;
+    padding-top: 120px; /* Adjust padding-top to account for the new full-width header */
+    position: fixed;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-right: 1px solid #ccc;
+    z-index: 100;
+    gap: 10px;
+}
+
+.left-nav1 li {
+background: none;
+    border: none;
+    font-size: 1.1em;
+    padding: 15px 20px;
+    margin: 8px 0; /* Adjust for padding within button */
+    text-align: left;
+    border-radius: 10px; /* Slightly rounded corners for buttons */
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 15px; /* Space between icon and text */
+    position: relative;
+    overflow: hidden; 
+    font-weight: bold;
+}
+
+.left-nav1 button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.left-nav1 button:hover {
+    background-color: var(--primary-color);
+    filter: brightness(1.1);
+}
+
+.child-info-banner {
+    /* This element is now redundant as child info is in the main header. */
+    /* You might want to remove or repurpose it. */
+    display: none; /* Temporarily hide it, consider removing it from HTML */
+}
+
+/* Optional: Responsive adjustment */
+@media (max-width: 768px) {
+    .child-info-banner {
+        font-size: 1rem;
+        padding: 10px 16px;
+    }
+}
+
+.curve-separator5 {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    z-index: 150;
+    background-color: var(--primary-color);
+    height: 100px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.curve-separator5 svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    position: absolute;
+    bottom: 0;
+}
+
+.wave-wave-back5,
+.wave-front5 {
+    fill: var(--primary-color);
+}
+
+/* Modified curve-content5 for left, center, right alignment */
+.curve-content5 {
+    position: absolute;
+    top: 0; /* Align to top of curve-separator5 */
+    left: 0; /* Align to left of curve-separator5 */
+    width: 100%; /* Take full width of curve-separator5 */
+    height: 100%; /* Take full height of curve-separator5 */
+    display: flex;
+    justify-content: space-between; /* Distribute items with space between */
+    align-items: center; /* Vertically align items */
+    padding: 0 20px; /* Add some padding on the sides */
+    color: var(--white);
+    z-index: 10;
+}
+
+.curve-left-section {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between icon and text if you add text here later */
+}
+
+.curve-middle-section {
+    flex-grow: 1; /* Allows this section to take up available space */
+    text-align: center; /* Center the text within this section */
+}
+
+.curve-right-section {
+    text-align: right; /* Align child info to the right */
+    white-space: nowrap; /* Prevent child info from wrapping */
+    font-size: 1.1rem; /* Adjust font size as needed */
+    font-weight: 500;
+}
+
+.curve-icon5 {
+    width: 40px;
+    height: 40px;
+    display: flex; /* To center the image if needed */
+    align-items: center;
+    justify-content: center;
+}
+
+.curve-icon5 img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.curve-text5 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    font-family: 'Merriweather', serif;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Ensure chat window doesn't go under the header */
+.chat-heading-row {
+    padding-top: 20px;
+    margin-top: -80px;
+}
+.curve-app-title {
+    font-size: 1.5rem; /* Adjust as needed */
+    font-weight: bold;
+    font-family: 'Merriweather', serif;
+    white-space: nowrap;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 40px; /* Space below profile section */
+  margin-top: 20px; /* Space from top of sidebar */
+}
+
+.profile-picture {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #ffc107; /* Yellow background for placeholder */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.profile-picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-info {
+    text-align: center;
+}
+
+.profile-name {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #fff; /* White text */
+}
+
+.profile-title {
+  font-size: 0.85em;
+  color: #bbb; /* Lighter text for title */
+}
+.child-badge {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 6px 12px;
+    border-radius: 12px;
+    text-align: center;
+    color: #fff;
+    font-size: 0.9rem;
+    margin-left: 15px;
+    line-height: 1.2;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.child-name {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.child-age {
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+.suggestion-box {
+     background-color: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 120px;
+    overflow-y: auto;
+    margin: 0 10px;
+    padding: 5px;
+    box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+
+.suggestion-item {
+   padding: 6px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    border-bottom: 1px solid #eee;
+}
+
+.suggestion-item:hover {
+    background-color: #f0f0f0;
+}
+.live-suggestions-box {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 120px;
+    overflow-y: auto;
+    margin: 0 10px;
+    padding: 5px;
+    box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+    z-index: 10;
+    position: relative;
+}
+/* This ensures the right section (curve-right-section) aligns content properly */
+/* This ensures the right section (curve-right-section) aligns content properly */
+.curve-right-section {
+    display: flex;
+    flex-direction: column; /* Stack elements vertically */
+    justify-content: center; /* Center the content vertically */
+    align-items: flex-end; /* Align the group of labels and values to the right */
+    padding-right: 20px; /* Adjust as needed */
+    gap: 4px; /* Space between lines */
+    white-space: nowrap; /* Prevent wrapping of the content */
+    font-size: 1.1rem; /* Adjust font size as needed */
+    font-weight: 500; /* Set font weight */
+    min-width: 150px; /* Set a minimum width so it won't shrink too much */
+}
+
+/* Ensure each child-info-line stays separate and doesn't overflow */
+.child-info-line {
+    display: flex; /* Use flexbox for label and value alignment */
+    justify-content: flex-end; /* Push content to the right */
+    align-items: baseline; /* Align text baselines */
+    width: 100%; /* Ensure it takes full width of its parent */
+}
+
+/* New style for the labels to ensure consistent width and right alignment */
+.child-info-label {
+    text-align: right; /* Align the label text to the right */
+    padding-right: 5px; /* Add a small gap between label and value */
+    /* You can set a fixed width here if you want perfect vertical alignment
+       for the values, regardless of label length.
+       Example: min-width: 100px;
+    */
+}
+
+/* Styling for the strong text (values) */
+.child-info-line strong {
+    font-weight: bold;
+    text-align: left; /* Align the value text to the left within its space */
+    flex-grow: 1; /* Allow the value to take up remaining space */
+}
+.fixed-child-info {
+  position: fixed;
+  top: 100px;
+  left: 220px;
+  right: 0;
+  background: var(--white);
+  padding: 20px 24px;
+  display: flex;
+  justify-content: left;
+  gap: 48px;
+  z-index: 1000;
+  box-shadow: var(--shadow-light);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--medium-gray);
+}
+
+.fixed-child-info span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+}
+
+.fixed-child-info strong {
+  color: var(--primary-color);
+  font-weight: 600;
+}

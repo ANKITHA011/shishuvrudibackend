@@ -1,0 +1,265 @@
+@import './colors.css';
+/* Main Wrappers */
+.main-wrapper1, .main-wrapper-two1 {
+  background-color: var(--white);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-wrapper1 {
+  width: 100%;
+  max-width: 200px;
+  height: 97vh;
+  position: relative;
+}
+
+.container1 {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Dual Section Wrapper */
+.main-wrapper-two1 {
+  flex-direction: row;
+  height: 90vh;
+  width: 100vw;
+  max-width: 1200px;
+  margin: 50px 0;
+  background-color: #f0f2f5;
+}
+
+/* Left Section - Video */
+.left-section1 {
+  flex: 1;
+  background-color: #e0e7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+  border-right: none;
+}
+
+.instruction-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  margin: 0;
+  display: block;
+}
+
+/* Right Section - Sign-in Form */
+.right-section1 {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #fdfdfd;
+  padding: 2rem;
+  position: relative;
+}
+
+/* Sign-in Form Container */
+.signin-wrapper {
+  width: 100%;
+  max-width: 500px;
+  background: linear-gradient(to bottom right, #ffffff, #f1f4f9);
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  animation: fadeIn 0.6s ease-in-out;
+}
+
+/* Form Header */
+.form-container h2 {
+  font-size: 2rem;
+  color: var(--font-color);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+/* Input Styling */
+.input-wrapper {
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.input-row {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  padding: 0.5rem 1rem 0.5rem 2.5rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  transition: border-color 0.3s ease;
+}
+
+.input-row:focus-within {
+  border-color: var(--white)
+}
+
+.input-icon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  color: #333;
+  z-index: 1;
+}
+
+.custom-input {
+  border: none;
+  outline: none;
+  flex: 1;
+  font-size: 1rem;
+  padding: 0.5rem;
+  background-color: transparent;
+}
+
+/* Error States */
+.input-error {
+  border-color: red !important;
+}
+
+.field-error {
+  color: red;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  height: 1rem;
+}
+
+.general-error {
+  color: red;
+  text-align: center;
+  margin: 1rem 0;
+  font-weight: bold;
+}
+
+/* Sign-in Button */
+.signin-button {
+  width: 100%;
+  padding: 12px 20px;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+.signin-button:hover{
+  background-color:var(--primary-color)
+}
+.signin-button:disabled {
+  background-color:var(--primary-color);
+  cursor: not-allowed;
+}
+
+/* Sign-up Link */
+.signup-text {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--font-color);
+}
+
+.signup-link {
+  color: var(--primary-color);
+  cursor: pointer;
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+/* Curved SVG Section */
+.curve-separator1 {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 150px;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.curve-separator1 svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wave-wave-back1,
+.wave-wave-front1 {
+  fill: var(--primary-color);
+}
+
+.curve-content1 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  z-index: 2;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.curve-icon1 img {
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .main-wrapper-two1 {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .left-section1 {
+    height: 50vh;
+  }
+
+  .right-section1 {
+    padding: 1rem;
+  }
+
+  .signin-wrapper {
+    margin: 1rem;
+    width: auto;
+  }
+}
+.forgot-password-text {
+  text-align: right;
+  margin-top: 4px;
+  font-size: 0.9rem;
+}
+
+.forgot-password-link {
+  color:var(--primary-color);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.forgot-password-link:hover {
+  color: #0056b3;
+}
+.back-home-button {
+  background-color: transparent;
+  border: none;
+  color: black;
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 500px;
+}
+
+.back-home-button:hover {
+  text-decoration: underline;
+}

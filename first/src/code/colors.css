@@ -1,0 +1,22 @@
+/* colors.css */
+
+
+
+
+
+:root {
+  --primary-color: oklch(60.6% 0.25 292.717);
+  --background-light:#e4d3ff;
+  --lang-button-bg: #f3ebff;
+  --lang-button-border: rgb(66, 65, 65);
+  --white: #ffffff;
+  --black: black;
+  --avatar-shadow: rgba(255, 105, 135, 0.3);
+  --user-message: #daf0da;
+  --bot-message:#C1C9FA;
+  --scrollbar-color: #ccc;
+  --timestamp:#888;
+
+  --text-default: 
+
+}

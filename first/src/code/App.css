@@ -1,0 +1,247 @@
+@import './colors.css';
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Rubik:wght@400;500;700&display=swap');
+
+html, body {
+  font-family: Rubik, Merriweather;
+  font-size: 18px;
+  margin: 0;
+  padding: 0;
+  background: #e4d3ff !important;
+  height: 97%;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  color: var(--black);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+.main-wrapper, .main-wrapper-two {
+  background-color: var(--white);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+}
+
+.main-wrapper {
+  width: 100vh;
+  max-width: 800px;
+  height: 97vh;
+  position: relative;
+  flex-direction: column;
+}
+
+.main-wrapper-two {
+  flex-direction: row;
+  height: 90vh;
+  width: 100vw;
+  max-width: 1200px;
+  margin: 50px 0;
+  background-color: #f0f2f5;
+}
+
+.left-section {
+  flex: 1;
+  background-color: var(--white);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border-right: 1px solid #ddd;
+  color: rgb(11, 11, 11);
+}
+
+.instruction-image {
+  width: 90%;
+  max-width: 300px;
+  margin-bottom: 20px;
+}
+
+.instructions-text {
+  text-align: center;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: var(--dark);
+}
+
+.right-section {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--white);
+}
+
+.curve-separator9 {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--white); /* So it's not transparent */
+  height: 100px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.curve-separator9 svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wave-wave-back9,
+.wave-wave-front9 {
+  fill: var(--primary-color);
+}
+
+.curve-content9 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  z-index: 2;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.curve-icon9 img {
+  width: 40px;
+  height: 40px;
+  margin-right: 10px;
+}
+
+.chat-container {
+  flex-grow: 1;
+  padding: 0 20px 15px;
+  background-color: var(--white);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: center;
+}
+
+.text-area {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+}
+
+.message1-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.message1 {
+  font-size: 22px;
+  color: var(--black);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.speak-button {
+  color: var(--black);
+  background: var(--white);
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.speak-button:hover {
+  background: var(--primary-color);
+}
+
+.language-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.lang-btn-combined {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background-color: var(--lang-button-bg);
+  border: 1px solid var(--lang-button-border);
+  color: var(--black);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.lang-btn-combined:hover,
+.lang-btn-combined.selected {
+  background-color: var(--primary-color);
+  color: var(--white);
+  transform: translateY(-2px);
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.start-chat-button {
+  flex: 1;
+  padding: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--white);
+  background: var(--primary-color);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.3s ease;
+}
+
+.start-chat-button:hover {
+  transform: scale(1.03);
+  background: var(--primary-color);
+}
+
+.loading {
+  font-size: 1.3em;
+  color: var(--primary-color);
+  text-align: center;
+  margin-top: 100px;
+  font-weight: 600;
+  font-family: 'Rubik', sans-serif;
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.location-info {
+  font-size: 1rem;
+  color: black;
+  font-weight: 500;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
