@@ -9,7 +9,7 @@ import mysql.connector
 from langdetect import detect
 from deep_translator import GoogleTranslator
 from gtts import gTTS
-from datetime import datetime, timedelta
+#from datetime import datetime, timedelta
 
 chatbot_bp = Blueprint("chatbot", __name__)
 
