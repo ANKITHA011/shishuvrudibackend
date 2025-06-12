@@ -1,21 +1,44 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./newchild.css";
+// Volume2, Mic, LogOut are imported but only LogOut is used in CurveHeader.
+// If Volume2 and Mic are not used elsewhere, they can be removed.
+import { LogOut } from "lucide-react";
+import { IoMdHome } from "react-icons/io";
+import { PiBabyBold } from "react-icons/pi";
 
-const CurveHeader = () => (
+const CurveHeader = () => {
+  const navigate = useNavigate();
+
+  return (
+    // The curve-separator100 will now flow with its parent
     <div className="curve-separator100">
-        <svg viewBox="0 0 500 80" preserveAspectRatio="none">
-            <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
-            <path d="M0,0 C200,80 400,20 500,40 L500,0 L0,0 Z" className="wave wave-front5" />
-        </svg>
-    <div className="curve-content1">
-      <div className="curve-icon1">
-        <img src="/baby-icon.png" alt="Baby Icon" />
+      <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+        <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
+        <path d="M0,0 C200,80 400,20 500,40 L500,0 L0,0 Z" className="wave wave-front5" />
+      </svg>
+      {/* Content for the curve header */}
+      <div className="curve-content100">
+        <div className="curve-icon100">
+          <img src="/baby-icon.png" alt="Baby Icon" />
+          <span className="curve-text100">Shishu Vriddhi</span>
+        </div>
+
+        <div className="top-navigation">
+          <div className="nav-icon" onClick={() => navigate("/")}>
+            <IoMdHome size={35} />
+          </div>
+          <div className="nav-icon" onClick={() => navigate("/child-info")}>
+            <PiBabyBold size={35} />
+          </div>
+          <div className="nav-icon" onClick={() => navigate("/signin", { state: { lang: 'en' } })}>
+            <LogOut size={35} />
+          </div>
+        </div>
       </div>
-      <span className="curve-text1">Shishu Vriddhi</span>
     </div>
-  </div>
-);
+  );
+};
 
 function NewChildInfo() {
   const [child, setChild] = useState({
@@ -74,7 +97,7 @@ function NewChildInfo() {
       setErrors({ general: currentErrors.phoneNotFound });
       setTimeout(() => navigate("/"), 2000);
     }
-  }, [navigate]);
+  }, [navigate, currentErrors.phoneNotFound]);
 
   const handleChange = (e) => {
     setChild({ ...child, [e.target.name]: e.target.value });
@@ -91,7 +114,6 @@ function NewChildInfo() {
     if (!child.date_of_birth) tempErrors.date_of_birth = currentErrors.dobRequired;
     if (!child.gender) tempErrors.gender = currentErrors.genderRequired;
 
-    // Validate height and weight (positive numbers)
 
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
@@ -133,108 +155,107 @@ function NewChildInfo() {
   };
 
   return (
-    <div className="container1">
-      <div className="main-wrapper-two1">
-        <div className="right-section1">
-          <div className="signin-wrapper">
-            <div className="form-container">
-              <h2>ADD CHILD</h2>
-
-              {/* Name */}
-              <div className="input-wrapper">
-                 <CurveHeader />
-                <div className="input-row">
-                  <span className="input-icon">👶</span>
-                  <input
-                    ref={nameInputRef}
-                    type="text"
-                    name="name"
-                    placeholder={currentLabels.name}
-                    value={child.name}
-                    onChange={handleChange}
-                    className={`custom-input ${errors.name ? "input-error" : ""}`}
-                  />
-                </div>
-                {errors.name && <div className="field-error">{errors.name}</div>}
-              </div>
-
-              {/* Date of Birth */}
-              <div className="input-wrapper">
-                <div className="input-row">
-                  <span className="input-icon">🎂</span>
-                  <input
-                    type="date"
-                    name="date_of_birth"
-                    value={child.date_of_birth}
-                    onChange={handleChange}
-                    className={`custom-input ${errors.date_of_birth ? "input-error" : ""}`}
-                  />
-                </div>
-                {errors.date_of_birth && <div className="field-error">{errors.date_of_birth}</div>}
-              </div>
-
-              {/* Gender */}
-              <div className="input-wrapper">
-                <div className="input-row">
-                  <span className="input-icon">⚧️</span>
-                  <select
-                    name="gender"
-                    value={child.gender}
-                    onChange={handleChange}
-                    className={`custom-input ${errors.gender ? "input-error" : ""}`}
-                  >
-                    <option value="">{currentLabels.gender}</option>
-                    <option value="Male">{currentLabels.genderOptions.male}</option>
-                    <option value="Female">{currentLabels.genderOptions.female}</option>
-                    <option value="Other">{currentLabels.genderOptions.other}</option>
-                  </select>
-                </div>
-                {errors.gender && <div className="field-error">{errors.gender}</div>}
-              </div>
-
-              {/* Height */}
-              <div className="input-wrapper">
-                <div className="input-row">
-                  <span className="input-icon">📏</span>
-                  <input
-                    type="number"
-                    name="height"
-                    placeholder={currentLabels.height}
-                    value={child.height}
-                    onChange={handleChange}
-                    className={`custom-input ${errors.height ? "input-error" : ""}`}
-                  />
-                </div>
-                {errors.height && <div className="field-error">{errors.height}</div>}
-              </div>
-
-              {/* Weight */}
-              <div className="input-wrapper">
-                <div className="input-row">
-                  <span className="input-icon">⚖️</span>
-                  <input
-                    type="number"
-                    name="weight"
-                    placeholder={currentLabels.weight}
-                    value={child.weight}
-                    onChange={handleChange}
-                    className={`custom-input ${errors.weight ? "input-error" : ""}`}
-                  />
-                </div>
-                {errors.weight && <div className="field-error">{errors.weight}</div>}
-              </div>
-
-              {/* General error */}
-              {errors.general && <div className="general-error">{errors.general}</div>}
-
-              <button className="signin-button" onClick={handleSubmit}>
-                REGISTER CHILD
-              </button>
-            </div>
+      <div className="signin-wrapper100">
+        {/* CurveHeader is now part of the form's content */}
+        <CurveHeader />
+        <h2>ADD CHILD</h2>
+         <div className="signin-inner100">
+        {/* Child's Name */}
+        <div className="input-wrapper100">
+          <label className="field-label100">{currentLabels.name}</label>
+          <div className="input-row100">
+            <span className="input-icon100">👶</span>
+            <input
+              ref={nameInputRef}
+              type="text"
+              name="name"
+              placeholder={currentLabels.name}
+              value={child.name}
+              onChange={handleChange}
+              className={`custom-input ${errors.name ? "input-error" : ""}`}
+            />
           </div>
+          {errors.name && <div className="field-error">{errors.name}</div>}
         </div>
+
+        {/* Date of Birth */}
+        <div className="input-wrapper100">
+          <label className="field-label100">{currentLabels.dateOfBirth}</label>
+          <div className="input-row100">
+            <span className="input-icon100">🎂</span>
+            <input
+              type="date"
+              name="date_of_birth"
+              value={child.date_of_birth}
+              onChange={handleChange}
+              className={`custom-input ${errors.date_of_birth ? "input-error" : ""}`}
+            />
+          </div>
+          {errors.date_of_birth && <div className="field-error">{errors.date_of_birth}</div>}
+        </div>
+
+        {/* Gender */}
+        <div className="input-wrapper100">
+          <label className="field-label100">{currentLabels.gender}</label>
+          <div className="input-row100">
+            <span className="input-icon100">⚧️</span>
+            <select
+              name="gender"
+              value={child.gender}
+              onChange={handleChange}
+              className={`custom-input ${errors.gender ? "input-error" : ""}`}
+            >
+              <option value="">{currentLabels.gender}</option>
+              <option value="Male">{currentLabels.genderOptions.male}</option>
+              <option value="Female">{currentLabels.genderOptions.female}</option>
+              <option value="Other">{currentLabels.genderOptions.other}</option>
+            </select>
+          </div>
+          {errors.gender && <div className="field-error">{errors.gender}</div>}
+        </div>
+
+        {/* Height */}
+        <div className="input-wrapper100">
+          <label className="field-label100">{currentLabels.height}</label>
+          <div className="input-row100">
+            <span className="input-icon100">📏</span>
+            <input
+              type="number"
+              name="height"
+              placeholder={currentLabels.height}
+              value={child.height}
+              onChange={handleChange}
+              className={`custom-input ${errors.height ? "input-error" : ""}`}
+            />
+          </div>
+          {errors.height && <div className="field-error">{errors.height}</div>}
+        </div>
+
+        {/* Weight */}
+        <div className="input-wrapper100">
+          <label className="field-label100">{currentLabels.weight}</label>
+          <div className="input-row100">
+            <span className="input-icon100">⚖️</span>
+            <input
+              type="number"
+              name="weight"
+              placeholder={currentLabels.weight}
+              value={child.weight}
+              onChange={handleChange}
+              className={`custom-input ${errors.weight ? "input-error" : ""}`}
+            />
+          </div>
+          {errors.weight && <div className="field-error">{errors.weight}</div>}
+        </div>
+
+        {/* General error */}
+        {errors.general && <div className="general-error">{errors.general}</div>}
+
+        <button className="signin-button" onClick={handleSubmit}>
+          REGISTER CHILD
+        </button>
       </div>
-    </div>
+     </div>
   );
 }
 

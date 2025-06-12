@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Award, ArrowLeft, LogOut } from "lucide-react";
@@ -13,6 +12,7 @@ function MilestoneAssessment() {
   const [responses, setResponses] = useState({});
   const [pastResponses, setPastResponses] = useState({});
   const [recommendation, setRecommendation] = useState(null);
+  const [concern, setConcern] = useState(null); // New state for concern
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [childInfo, setChildInfo] = useState(JSON.parse(localStorage.getItem("childInfo")));
@@ -29,19 +29,19 @@ function MilestoneAssessment() {
   useEffect(() => {
     const info = JSON.parse(localStorage.getItem("childInfo"));
     setChildInfo(info);
-    
+
     // Set parent name from localStorage immediately to avoid "Loading..."
     const cachedParentName = localStorage.getItem("parentName");
     if (cachedParentName) {
       setParentName(cachedParentName);
     }
-    
+
     // Set child list from localStorage immediately
     const cachedChildList = JSON.parse(localStorage.getItem("childList"));
     if (cachedChildList) {
       setChildList(cachedChildList);
     }
-    
+
     if (info?.phone) {
       fetchParentName(info.phone);
     }
@@ -50,8 +50,8 @@ function MilestoneAssessment() {
   // Effect to fetch milestones and past responses (depends on childInfo)
   useEffect(() => {
     if (!childInfo) {
-        setIsLoading(false);
-        return;
+      setIsLoading(false);
+      return;
     }
 
     setIsLoading(true);
@@ -104,19 +104,20 @@ function MilestoneAssessment() {
   };
 
   const handleChildSwitch = (selectedId) => {
-      const selected = childList.find(c => c.id === parseInt(selectedId));
-      if (selected) {
-          const updatedChild = { ...selected, phone: childInfo.phone };
-          localStorage.setItem("childInfo", JSON.stringify(updatedChild));
-          setChildInfo(updatedChild);
-          // Reset assessment state to load new child's assessment
-          setMilestones([]);
-          setResponses({});
-          setPastResponses({});
-          setRecommendation(null);
-          setCurrentIndex(0);
-          setIsLoading(true);
-      }
+    const selected = childList.find(c => c.id === parseInt(selectedId));
+    if (selected) {
+      const updatedChild = { ...selected, phone: childInfo.phone };
+      localStorage.setItem("childInfo", JSON.stringify(updatedChild));
+      setChildInfo(updatedChild);
+      // Reset assessment state to load new child's assessment
+      setMilestones([]);
+      setResponses({});
+      setPastResponses({});
+      setRecommendation(null);
+      setConcern(null); // Reset concern
+      setCurrentIndex(0);
+      setIsLoading(true);
+    }
   };
 
   const handleSelect = (question, answer) => {
@@ -142,7 +143,8 @@ function MilestoneAssessment() {
       .then((res) => res.json())
       .then((data) => {
         if (data.recommendation) {
-          setRecommendation(`${data.recommendation}\n\nConcern: ${data.concern}`);
+          setRecommendation(data.recommendation);
+          setConcern(data.concern); // Set concern separately
         }
       })
       .catch((err) => console.error("Error submitting milestones:", err));
@@ -167,17 +169,8 @@ function MilestoneAssessment() {
         <div className="curve-right-section">
           {parentName && (
             <div className="parent-header-info">
-              Parent: <strong>{parentName}</strong>
-            </div>
-          )}
-          {childInfo && (
-            <div className="child-header-info">
-              <div className="child-info-line">
-                Child Name: <strong>{childInfo.name}</strong>
-              </div>
-              <div className="child-info-line">
-                Age In Months: <strong>{childInfo.age}</strong>
-              </div>
+              Sign in as <strong>{parentName}</strong>
+              <div><span>Karnataka,India</span></div>
             </div>
           )}
         </div>
@@ -191,6 +184,7 @@ function MilestoneAssessment() {
         <li onClick={() => navigate("/")} className="nav-item"><IoMdHome size={35}/>Home</li>
         <li onClick={() => navigate("/child-info")} className="nav-item"><PiBabyBold size={35} />Child Info</li>
         <li onClick={() => navigate("/chatbot")} className="nav-item"><IoChatbubbleEllipsesSharp  size={35}/>Chat</li>
+        <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}className="nav-item"><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
         <li
           onClick={() => navigate("/signin", { state: { lang: "en" } })}
           className="nav-item"
@@ -224,21 +218,29 @@ function MilestoneAssessment() {
         <div className="main-content">
           <CurveHeader childInfo={childInfo} parentName={parentName} />
           <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-                    <span><strong>Child Name:</strong> {childInfo.name}</span>
-                    <span><strong>Age in Months:</strong> {childInfo.age}</span>
-                </div>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
+              <span><strong>Child Name:</strong> {childInfo.name}</span>
+              <span><strong>Age in Months:</strong> {childInfo.age}</span>
+            </div>
+          </div>
           <div className="recommendation-container">
             <h3>Personalized Development Recommendations</h3>
             <div className="recommendation-content">
+              {/* Render recommendation and concern separately */}
               <p>{recommendation}</p>
+              {concern && (
+                <p>
+                  <br /> {/* This creates a new line */}
+                  <strong>Concern based on all the previously answered milestone question:</strong> {concern}
+                </p>
+              )}
             </div>
             <div className="action-buttons2">
               <button
                 className="back-button"
                 onClick={() => {
                   setRecommendation(null);
+                  setConcern(null); // Reset concern
                   setCurrentIndex(0);
                   setResponses({});
                 }}
@@ -262,25 +264,25 @@ function MilestoneAssessment() {
       <div className="main-content">
         <CurveHeader childInfo={childInfo} parentName={parentName} />
         {childInfo && (
-            <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-                    <span><strong>Child Name:</strong> {childInfo.name}</span>
-                    <span><strong>Age in Months:</strong> {childInfo.age}</span>
-                </div>
-                {childList.length > 0 && (
-                    <select
-                        value={childInfo?.id || ''}
-                        onChange={(e) => handleChildSwitch(e.target.value)}
-                        style={{ padding: '6px', borderRadius: '6px', fontSize: '14px' }}
-                    >
-                        {childList.map(child => (
-                            <option key={child.id} value={child.id}>
-                                {child.name} ({child.age}m)
-                            </option>
-                        ))}
-                    </select>
-                )}
+          <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
+              <span><strong>Child Name:</strong> {childInfo.name}</span>
+              <span><strong>Age in Months:</strong> {childInfo.age}</span>
             </div>
+            {childList.length > 0 && (
+              <select
+                value={childInfo?.id || ''}
+                onChange={(e) => handleChildSwitch(e.target.value)}
+                style={{ padding: '6px', borderRadius: '6px', fontSize: '14px' }}
+              >
+                {childList.map(child => (
+                  <option key={child.id} value={child.id}>
+                    {child.name} ({child.age}m)
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         )}
         <div className="assessment-content">
           <div className="progress-section">

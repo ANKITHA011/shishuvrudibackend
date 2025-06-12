@@ -9,12 +9,12 @@ import mysql.connector
 from langdetect import detect
 from deep_translator import GoogleTranslator
 from gtts import gTTS
-#from datetime import datetime, timedelta
+from datetime import datetime, timedelta
 
 chatbot_bp = Blueprint("chatbot", __name__)
 
 # Configure Gemini API
-"""genai.configure(api_key="AIzaSyDO-nvH8fpcmru_FE61V9gpsU-nDOwaVko")"""
+genai.configure(api_key="AIzaSyDO-nvH8fpcmru_FE61V9gpsU-nDOwaVko")
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # Redis setup
@@ -280,12 +280,13 @@ def chatbot_response():
             f"You are a certified Early Childhood Development expert and pediatric consultant.\n"
             f"A parent is asking about their {age}-month-old {gender} child named {name}.\n"
             f"Provide helpful, simple, age-appropriate guidance.\n\n"
-            "Provide a warm, evidence-based response that:\n"
+            "Provide a evidence-based response that:\n"
             "- Addresses their specific concern with empathy\n"
             "- Offers practical, actionable advice\n"
             "- Suggests when to consult a pediatrician if relevant\n"
             "- Remember the parent and child are from India\n"
             "- Uses encouraging, supportive language\n\n"
+            "-response should be point wise not a paragragh and easy to understand next point should begin in a new line\n"
             f"Limit the response to 50-100 words\n"
             f"{conversation_history}"
             f"Parent: {translated_input}\n"
@@ -308,6 +309,10 @@ def chatbot_response():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+from flask import request, jsonify
+from datetime import datetime
+#from your_db_connection import conn  # Replace with your actual DB connection import
+
 @chatbot_bp.route("/children", methods=["POST"])
 def get_registered_children():
     data = request.json
@@ -324,29 +329,34 @@ def get_registered_children():
             """, (phone,))
             children_data = cursor.fetchall()
 
-        # Calculate age in months more precisely
-        children = []
         today = datetime.now().date()
+        children = []
+
         for child in children_data:
-            dob = child['date_of_birth']
+            dob = child.get("date_of_birth")
             if dob:
-                # Calculate full months
+                # Convert to date if necessary
+                if isinstance(dob, str):
+                    dob = datetime.strptime(dob, "%Y-%m-%d").date()
+
+                # Calculate age in months
                 age_in_months = (today.year - dob.year) * 12 + (today.month - dob.month)
                 if today.day < dob.day:
                     age_in_months -= 1
             else:
-                age_in_months = None # Handle cases where DOB might be missing
+                age_in_months = None
 
             children.append({
-                'id': child['id'],
-                'name': child['name'],
-                'gender': child['gender'],
-                'age': age_in_months # This is the calculated age in months
+                "id": child["id"],
+                "name": child["name"],
+                "gender": child["gender"],
+                "age": age_in_months
             })
 
         return jsonify(children)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 @chatbot_bp.route("/children/<int:child_id>", methods=["DELETE"])
 def delete_child(child_id):
@@ -566,12 +576,13 @@ def get_parent_name():
 
 
 
-# Helper function to get ideal ranges (simplified for demonstration)
-# In a real application, this would fetch from a reliable source like WHO growth charts
+from flask import Blueprint, request, jsonify
+import traceback
+# Assuming 'conn' and 'get_ideal_ranges' and 'model' (for Gemini) are imported/defined elsewhere
+
+
 def get_ideal_ranges(age_months, gender=None):
-    # These are very simplified and general ranges.
-    # For a real application, use precise percentile data from growth charts.
-    # Example data (highly simplified and NOT medically accurate for all cases):
+    # Simplified ideal ranges, modify as needed
     if 0 <= age_months <= 3:
         return {"height_min": 45, "height_max": 65, "weight_min": 2.5, "weight_max": 7}
     elif 4 <= age_months <= 6:
@@ -581,11 +592,13 @@ def get_ideal_ranges(age_months, gender=None):
     elif 10 <= age_months <= 12:
         return {"height_min": 65, "height_max": 85, "weight_min": 7.5, "weight_max": 12.5}
     else:
-        return {"height_min": 40, "height_max": 85, "weight_min": 2, "weight_max": 15} # Fallback for out of range or general
+        return {"height_min": 40, "height_max": 85, "weight_min": 2, "weight_max": 15}
+
+
 
 @chatbot_bp.route("/child_assessment", methods=["POST", "OPTIONS"])
 def child_assessment():
-    # Handle preflight request for CORS
+    # Handle CORS preflight request
     if request.method == 'OPTIONS':
         response = jsonify({})
         response.headers.add("Access-Control-Allow-Origin", "*")
@@ -600,105 +613,124 @@ def child_assessment():
             response.headers.add("Access-Control-Allow-Origin", "*")
             return response, 400
 
+        name = data.get("name", "the child")
+        phone = data.get("phone")
+        gender = data.get("gender")  # optional
         try:
             age_months = int(data.get("age"))
-            # Added gender for more precise range lookup, though not fully implemented in get_ideal_ranges for simplicity
-            gender = data.get("gender") # Assuming gender is also passed in the request
-        except (TypeError, ValueError):
-            response = jsonify({"error": "Invalid age format. Must be a number of months."})
-            response.headers.add("Access-Control-Allow-Origin", "*")
-            return response, 400
-
-        # Validate age in months between 0 and 12
-        if not (0 <= age_months <= 12):
-            response = jsonify({"error": "Age must be between 0 and 12 months for this assessment."})
-            response.headers.add("Access-Control-Allow-Origin", "*")
-            return response, 400
-
-        name = data.get("name", "the child")
-
-        try:
             height_cm = float(data.get("height"))
             weight_kg = float(data.get("weight"))
         except (TypeError, ValueError):
-            response = jsonify({"error": "Height and weight must be numeric."})
+            response = jsonify({"error": "Invalid input types for age, height, or weight"})
             response.headers.add("Access-Control-Allow-Origin", "*")
             return response, 400
 
-        # Get ideal ranges based on age and optionally gender
+        # Validate required fields
+        if not phone:
+            response = jsonify({"error": "Phone number is required"})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 400
+
+        if not (0 <= age_months <= 12):
+            response = jsonify({"error": "Age must be between 0 and 12 months"})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 400
+
         ideal_ranges = get_ideal_ranges(age_months, gender)
         ideal_height_min = ideal_ranges["height_min"]
         ideal_height_max = ideal_ranges["height_max"]
         ideal_weight_min = ideal_ranges["weight_min"]
         ideal_weight_max = ideal_ranges["weight_max"]
 
-        # Validate realistic infant ranges (approximate) against the derived ideal ranges
-        if not (ideal_height_min <= height_cm <= ideal_height_max + 10): # Added buffer for practical validation
-            response = jsonify({"error": f"Height must be within a realistic range for a {age_months}-month-old ({ideal_height_min}-{ideal_height_max+10}cm)."})
+        if not (ideal_height_min <= height_cm <= ideal_height_max + 10):
+            response = jsonify({
+                "error": f"Height must be between {ideal_height_min} and {ideal_height_max + 10} cm"
+            })
             response.headers.add("Access-Control-Allow-Origin", "*")
             return response, 400
 
-        if not (ideal_weight_min <= weight_kg <= ideal_weight_max + 3): # Added buffer for practical validation
-            response = jsonify({"error": f"Weight must be within a realistic range for a {age_months}-month-old ({ideal_weight_min}-{ideal_weight_max+3}kg)."})
+        if not (ideal_weight_min <= weight_kg <= ideal_weight_max + 3):
+            response = jsonify({
+                "error": f"Weight must be between {ideal_weight_min} and {ideal_weight_max + 3} kg"
+            })
             response.headers.add("Access-Control-Allow-Origin", "*")
             return response, 400
 
-        # Determine height status
-        height_status = "within"
+        # Determine status
         if height_cm < ideal_height_min:
-            height_status = "below"
+            height_status = "below the ideal range"
         elif height_cm > ideal_height_max:
-            height_status = "above"
-
-        # Determine weight status
-        weight_status = "within"
-        if weight_kg < ideal_weight_min:
-            weight_status = "below"
-        elif weight_kg > ideal_weight_max:
-            weight_status = "above"
-
-        # Generate recommendation using Gemini if not in ideal range
-        recommendation = ""
-        prompt_needed = False
-        prompt_parts = [
-            f"You are a compassionate Early Childhood Development expert, specializing in infant growth for parents in India.",
-            f"A parent is concerned about their child, {name} (age: {age_months} months, height: {height_cm} cm, weight: {weight_kg} kg)."
-        ]
-
-        if height_status != "within" or weight_status != "within":
-            prompt_needed = True
-            prompt_parts.append("The child's measurements are outside the typical range.")
-            if height_status == "below":
-                prompt_parts.append(f"Specifically, {name}'s height is a bit below the ideal range for a child of this age ({ideal_height_min}-{ideal_height_max} cm).")
-            elif height_status == "above":
-                prompt_parts.append(f"Specifically, {name}'s height is a bit above the ideal range for a child of this age ({ideal_height_min}-{ideal_height_max} cm).")
-
-            if weight_status == "below":
-                prompt_parts.append(f"And {name}'s weight is a bit below the ideal range for this age ({ideal_weight_min}-{ideal_weight_max} kg).")
-            elif weight_status == "above":
-                prompt_parts.append(f"And {name}'s weight is a bit above the ideal range for this age ({ideal_weight_min}-{ideal_weight_max} kg).")
-
-            prompt_parts.append("Please provide a simple short,empathetic, and actionable suggestion for the parent what parent has to do to keep the child in ideal heigh and weight.Keep the response concise (50-100 words).")
+            height_status = "above the ideal range"
         else:
-            recommendation = (
-                f"That's wonderful! Based on the information provided, {name}'s height and weight appear to be "
-                f"within a healthy range for a {age_months}-month-old baby. Keep up the great work with "
-                f"their feeding and regular check-ups with your pediatrician. Consistent growth is key!"
+            height_status = "within the ideal range"
+
+        if weight_kg < ideal_weight_min:
+            weight_status = "below the ideal range"
+        elif weight_kg > ideal_weight_max:
+            weight_status = "above the ideal range"
+        else:
+            weight_status = "within the ideal range"
+
+        # Insert into DB
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO child_measurements (name, phone, height_cm, weight_kg)
+                VALUES (%s, %s, %s, %s)
+            """, (name, phone, height_cm, weight_kg))
+            conn.commit()
+            cursor.close()
+        except Exception as db_error:
+            print(f"DB insert error: {db_error}")
+            response = jsonify({"error": "Database insert failed"})
+            response.headers.add("Access-Control-Allow-Origin", "*")
+            return response, 500
+
+        # Generate recommendation
+        recommendation = ""
+        if height_status != "within the ideal range" or weight_status != "within the ideal range":
+            prompt_parts = [
+                "You are a compassionate Early Childhood Development expert, specializing in infant growth for parents in India.",
+                f"A parent is concerned about their child, {name} (age: {age_months} months, height: {height_cm} cm, weight: {weight_kg} kg).",
+                "The child's measurements are outside the typical range."
+            ]
+            if height_status == "below the ideal range":
+                prompt_parts.append(
+                    f"Specifically, {name}'s height is a bit below the ideal range for a child of this age ({ideal_height_min}-{ideal_height_max} cm)."
+                )
+            elif height_status == "above the ideal range":
+                prompt_parts.append(
+                    f"Specifically, {name}'s height is a bit above the ideal range for a child of this age ({ideal_height_min}-{ideal_height_max} cm)."
+                )
+            if weight_status == "below the ideal range":
+                prompt_parts.append(
+                    f"And {name}'s weight is a bit below the ideal range for this age ({ideal_weight_min}-{ideal_weight_max} kg)."
+                )
+            elif weight_status == "above the ideal range":
+                prompt_parts.append(
+                    f"And {name}'s weight is a bit above the ideal range for this age ({ideal_weight_min}-{ideal_weight_max} kg)."
+                )
+            prompt_parts.append(
+                "Please provide a simple short, empathetic, and actionable suggestion for the parent on what to do "
+                "to help the child maintain or reach ideal height and weight. Keep the response concise (50-100 words)."
             )
-
-
-        if prompt_needed:
             gemini_prompt = " ".join(prompt_parts)
+
             try:
                 gemini_response = model.generate_content(gemini_prompt)
                 recommendation = gemini_response.text.strip()
             except Exception as gemini_e:
-                recommendation = (
-                    "We're having trouble generating a personalized recommendation right now. "
-                    "However, since your child's height or weight is outside the ideal range, "
-                    "it's crucial to consult your pediatrician for a thorough assessment and guidance."
-                )
                 print(f"Gemini API error: {gemini_e}")
+                recommendation = (
+                    "We're unable to generate a personalized recommendation right now. "
+                    "Please consult your pediatrician for a detailed assessment and guidance."
+                )
+        else:
+            recommendation = (
+                f"That's wonderful! Based on the information provided, {name}'s height and weight are within "
+                f"a healthy range for a {age_months}-month-old baby. Keep up the great work with their feeding and "
+                "regular pediatric check-ups. Consistent growth is key!"
+            )
 
         response = jsonify({
             "age_months": age_months,
@@ -706,12 +738,46 @@ def child_assessment():
             "weight_kg": weight_kg,
             "height_status": height_status,
             "weight_status": weight_status,
-            "recommendation": recommendation
+            "recommendation": recommendation,
+            "ideal_height_min": ideal_height_min,
+            "ideal_height_max": ideal_height_max,
+            "ideal_weight_min": ideal_weight_min,
+            "ideal_weight_max": ideal_weight_max,
         })
         response.headers.add("Access-Control-Allow-Origin", "*")
         return response
 
     except Exception as e:
+        traceback.print_exc()
         response = jsonify({"error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", "*")
         return response, 500
+
+@chatbot_bp.route("/child_assessments", methods=["GET"])
+def get_child_assessments():
+    phone = request.args.get("phone")
+    name = request.args.get("name")
+
+    if not phone or not name:
+        return jsonify({"error": "Both phone and name are required"}), 400
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT height_cm, weight_kg,assessment_date
+            FROM child_measurements
+            WHERE phone = %s AND name = %s
+            ORDER BY assessment_date DESC
+        """, (phone, name))
+
+        results = cursor.fetchall()
+        assessments = [{"height_cm": row[0], "weight_kg": row[1],"assessment_date": row[2]} for row in results]
+
+        cursor.close()
+
+        response = jsonify(assessments)
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        return response
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": "Failed to retrieve assessments"}), 500

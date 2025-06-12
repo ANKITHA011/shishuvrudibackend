@@ -9,6 +9,7 @@ import NewChildInfo from "./code/NewChildInfo";
 import EditChild from "./code/EditChild";
 import MilestoneAssessment from "./code/MilestoneAssesment";
 import ChildAssessment from "./code/ChildAssesment";
+import BMICheck from "./code/BMICheck2";
 function App() {
   return (
     <div className="App">
@@ -23,7 +24,7 @@ function App() {
           <Route path="/chatbot" element={<ChatBot />} />
           <Route path="/edit-child/:childId" element={<EditChild />}/>
           <Route path="/milestone" element={<MilestoneAssessment />}/>
-          <Route path="/childassesment" element={<ChildAssessment/>}/>
+          <Route path="/bmicheck" element={<BMICheck/>}/>
         </Routes>
       </BrowserRouter>
     </div>

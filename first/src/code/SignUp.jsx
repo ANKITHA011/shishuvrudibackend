@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import translations from "./translations";
 import "./signin.css";
 import "./App.css";
+import { IoMdHome } from "react-icons/io";
 
 const CurveHeader = () => (
   <div className="curve-separator1">
@@ -144,6 +145,9 @@ function SignUp() {
 
         <div className="right-section1">
           <CurveHeader />
+                 <button className="back-home-button" onClick={() => navigate("/", { state: { lang: form.language } })}>
+            <IoMdHome size={35}/>
+          </button>
           <div className="signin-wrapper">
             <div className="form-container">
               <h2>{t.signup}</h2>

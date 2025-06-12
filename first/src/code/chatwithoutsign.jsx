@@ -367,18 +367,19 @@ function Withoutsignin() {
                     >
                       <span style={{ fontSize: "1.5em" }}>📊</span>Milestone
                     </li>
-                    <li
-                        onClick={downloadChat}
-                        disabled={chatEnded || loading}
-                        className={activeNavItem === 'download' ? 'active' : ''}
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                    >
-                       <FaArrowCircleDown size={50} /> Download
-                    </li>
-
                  </ul>
                 </div>
                  <CurveHeader />
+                 <div className="download-button-wrapper">
+    <button
+        className="download-btn-top"
+        onClick={downloadChat}
+        disabled={chatEnded || loading}
+    >
+        <FaArrowCircleDown style={{ marginRight: '8px' }} /> Download
+    </button>
+</div>
+
                 <div className="main-wrapper2">
           
                     <div className="chat-heading-row">

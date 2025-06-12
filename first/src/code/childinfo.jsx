@@ -97,7 +97,7 @@ function ChildInfo() {
       window.history.replaceState({}, document.title);
     }
   }, [location.state, phone]);
-  useEffect(() => {
+  /*useEffect(() => {
   const fetchUserLocation = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/userinfo");
@@ -110,7 +110,13 @@ function ChildInfo() {
   };
 
   fetchUserLocation();
+}, []);*/
+useEffect(() => {
+  // ✅ Hardcoded location values for demonstration purposes
+  setRegion("Karnataka");
+  setCountry("India");
 }, []);
+
 
 
   const startChat = (child) => {
@@ -226,7 +232,7 @@ function ChildInfo() {
                           <td className="child-name-cell"><strong>{child.name}</strong></td>
                           <td>
                             <span className="age-display">
-                              {child.age !== null ? `${child.age % 12}` : "N/A"}
+                              {child.age !== null ? `${child.age}` : "N/A"}
                             </span>
                           </td>
                           <td>
@@ -244,9 +250,12 @@ function ChildInfo() {
       navigate("/milestone");
     }}>
       📊
-    </button> <button className="btn-delete" onClick={() => handleDelete(child.id)}>
+    </button> 
+   
+    <button className="btn-delete" onClick={() => handleDelete(child.id)}>
                                 <MdDelete size={20} color="black" />
                               </button>
+
                             </div>
                           </td>
                         </tr>

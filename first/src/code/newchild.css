@@ -1,27 +1,353 @@
+/* newchild.css */
+
+/* Variables (if not already defined globally) */
+
+
+/* Overall page container for centering content */
+.signin-page-container {
+  display: flex;
+  justify-content: center; /* Center horizontally */
+  align-items: flex-start; /* Align to the top of the container */
+  min-height: 100vh; /* Take full viewport height */
+  padding-top: 50px; /* Reduced padding as CurveHeader is now inside the form */
+  padding-bottom: 50px; /* Add some padding at the bottom */
+  box-sizing: border-box; /* Include padding in element's total width and height */
+  background-color: #f0f2f5; /* Light background for the page */
+}
+
+
+/* ========== Curve Separator (Now part of the form's content) ========== */
 .curve-separator100 {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 63%;
-    z-index: 150;
-    background-color: var(--primary-color);
-    height: 100px;
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-left: 355px;
+  /* REMOVED: position: fixed; */
+  /* REMOVED: top: 0; */
+  /* REMOVED: left: 0; */
+  /* REMOVED: margin: 70px 0 0 560px; */
+
+  position: relative; /* Necessary for absolute positioning of curve-content100 */
+  width: 100%; /* Spans the full width of its parent (.signin-wrapper100) */
+  height: 100px;
+  z-index: 1; /* Ensure it's above other elements if needed, but not fixed z-index */
+  background-color: var(--primary-color);
+  overflow: hidden; /* Crucial to clip the SVG waves within the rounded corners */
+
+  /* Match the border-radius of the parent .signin-wrapper100 at the top */
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+
+  display: flex; /* Kept for its internal content alignment */
+  justify-content: space-between;
+  align-items: center;
+  /* Adjust margin-bottom to create space between curve and form title */
+  margin-bottom: 2rem;
 }
 
-.curve-separator5 svg {
-    display: block;
+/* Ensure SVG paths are styled */
+.wave-wave-back5 {
+  fill: var(--primary-color); /* Slightly different shade for depth */
+}
+
+.wave.wave-front5 {
+  fill: var(--primary-color);
+}
+
+.curve-content100 {
+  position: absolute; /* Relative to .curve-separator100 */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+.curve-icon100 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.curve-icon100 img {
+  height: 45px;
+  width: auto;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.curve-icon100 img:hover {
+  transform: scale(1.05);
+}
+
+.curve-text100 {
+  color: var(--white);
+  font-size: 1.9rem;
+  font-weight: 700;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+/* ========== Navigation ========== */
+.top-navigation {
+  display: flex;
+  gap: 15px; /* Add some space between icons */
+}
+
+.nav-icon {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+}
+
+.nav-icon:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.nav-icon svg {
+  color: var(--white);
+}
+
+/* ========== Sign-In Container ========== */
+.signin-wrapper100 {
+  width: 700px;
+  /* margin-top: 100px; <-- REMOVED - CurveHeader is now inside */
+  padding: 0; /* Remove padding from top/bottom here, let curve handle top padding */
+  /* Keep bottom padding */
+  background: linear-gradient(to bottom right, #ffffff, #f1f4f9);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
+  /* Add overflow hidden to clip any content that goes beyond the border-radius */
+  overflow: hidden;
+}
+.signin-inner100 {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 2rem;
+}
+
+
+.signin-wrapper100 h2 {
+  text-align: center;
+  margin-top: 1.5rem; /* Space below the curve and above the h2 */
+  margin-bottom: 2rem;
+  color: var(--primary-color);
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+
+/* ... (rest of your CSS for form elements remains largely the same) ... */
+
+/* ========== Input Fields ========== */
+.input-wrapper100 {
+  margin-bottom: 2rem; /* Adjusted for error messages */
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  position: relative; /* Essential for absolute positioning of error messages */
+}
+
+.field-label100 {
+  flex: 0 0 150px;
+  font-weight: bold;
+  color: var(--text-color);
+  text-align: left;
+  font-size: 1.1rem;
+}
+
+.input-row100 {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--white);
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-row100:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(106, 13, 173, 0.2);
+}
+
+.input-icon100 {
+  margin-right: 0.8rem;
+  font-size: 1.2rem;
+  color: var(--primary-color);
+}
+
+.custom-input {
+  flex-grow: 1;
+  border: none;
+  outline: none;
+  padding: 0;
+  font-size: 1rem;
+  color: var(--text-color);
+  background: transparent;
+}
+
+.custom-input::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+.custom-input:focus::placeholder {
+  color: transparent;
+}
+
+.custom-input::-webkit-datetime-edit-fields-wrapper {
+  background: transparent;
+}
+
+.custom-input::-webkit-calendar-picker-indicator {
+  filter: invert(40%) sepia(80%) saturate(2000%) hue-rotate(240deg) brightness(80%) contrast(80%);
+}
+
+.field-error {
+  color: #e74c3c; /* Red for errors */
+  font-size: 0.9rem;
+  /* Position absolute relative to .input-wrapper100 */
+  position: absolute;
+  left: calc(150px + 2rem); /* Align with input field start (label width + gap) */
+  width: calc(100% - 150px - 2rem); /* Adjust width */
+  bottom: -1rem; /* Position below the input */
+}
+
+/* General error messages (like phone not found) */
+.general-error {
+  color: #e74c3c;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-weight: bold;
+}
+
+.signin-button {
+  width: 100%;
+  padding: 1rem;
+  background-color: var(--primary-color);
+  color: var(--white);
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  margin-top: 1.5rem;
+}
+
+.signin-button:hover {
+  background-color: #5a0aa0; /* Slightly darker purple on hover */
+  transform: translateY(-2px);
+}
+
+.signin-button:active {
+  transform: translateY(0);
+}
+
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .signin-wrapper100 {
+    margin: 20px; /* Adjust margin for smaller screens */
+    max-width: calc(100% - 40px); /* Fill available width with margin */
+    padding-left: 1rem; /* Reduce side padding */
+    padding-right: 1rem;
+  }
+
+  .input-wrapper100 {
+    flex-direction: column; /* Stack label and input on small screens */
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .field-label100 {
+    flex: none; /* Remove fixed width */
+    width: 100%; /* Take full width */
+    text-align: left;
+    margin-bottom: 0.5rem;
+  }
+
+  .input-row100 {
     width: 100%;
-    height: auto;
-    position: absolute;
-    bottom: 0;
+  }
+
+  .curve-text100 {
+    font-size: 1.5rem;
+  }
+
+  .nav-icon svg {
+    size: 30px; /* Adjust icon size */
+  }
+
+  .field-error {
+    position: static; /* Remove absolute positioning on small screens */
+    width: auto;
+    left: auto;
+    bottom: auto;
+    margin-top: 0.2rem; /* Smaller top margin for error */
+    margin-left: 0;
+  }
+
+  .signin-page-container {
+    padding-top: 30px; /* Adjust padding for smaller screens */
+    padding-bottom: 30px;
+    align-items: center; /* Center vertically on smaller screens if content is short */
+  }
 }
 
-.wave-wave-back5,
-.wave-front5 {
-    fill: var(--primary-color);
+@media (max-width: 480px) {
+  .curve-content100 {
+    flex-direction: column; /* Stack icon and navigation */
+    justify-content: center;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .curve-text100 {
+    font-size: 1.2rem;
+  }
+
+  .top-navigation {
+    width: 100%;
+    justify-content: space-around;
+  }
+
+  .nav-icon {
+    padding: 0.3rem;
+  }
+
+  .nav-icon svg {
+    size: 25px;
+  }
+
+  .signin-wrapper100 {
+    margin: 10px; /* Even smaller margins */
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .signin-wrapper100 h2 {
+    font-size: 1.5rem;
+  }
+
+  .signin-button {
+    font-size: 1rem;
+    padding: 0.8rem;
+  }
+
+  .signin-page-container {
+    padding-top: 20px; /* Further adjust for very small screens */
+    padding-bottom: 20px;
+  }
 }

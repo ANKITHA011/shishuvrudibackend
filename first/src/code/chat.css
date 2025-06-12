@@ -341,3 +341,7 @@ background: none;
   color: var(--primary-color);
   font-weight: 600;
 }
+.message-text {
+    white-space: pre-wrap;  /* Preserves line breaks from \n */
+    line-height: 1;
+}

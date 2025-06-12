@@ -395,9 +395,10 @@ h2 {
 
 /* Empty State */
 .empty-state {
-  text-align: center;
+  margin-left: 400px;
   padding: 4rem 2rem;
   color: var(--text-muted);
+  margin-top: 50px;
 }
 
 .empty-state h2 {
@@ -809,12 +810,10 @@ margin-top: 20px;}
   color: #374151;
   padding: 4px 12px;
   font-size: 0.8rem;
-  margin-left: 50px;
   display: inline-block;
   width: 80px; /* or any smaller value */
   max-width: 80px;width: 80px; /* or any smaller value */
   max-width: 80px;
-  text-align: center;
 }
 
 .child-name-cell {

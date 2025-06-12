@@ -30,6 +30,7 @@ const CurveHeader = ({ childInfo, parentName }) => (
                 {childInfo && (
                     <div className="curve-right-section">
                         <div className="child-info-line">Sign in as {parentName || "Loading..."}</div>
+                        <span>Karnataka,India</span>
                     </div>
                 )}
             </div>
@@ -460,34 +461,56 @@ function ChatBot() {
                 <li onClick={() => navigate("/")}><IoMdHome size={35}/>Home</li>
                 <li onClick={() => navigate("/child-info")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><span style={{ fontSize: "1.5em" }}><PiBabyBold size={35} /></span>Child Info</li>
                 <li onClick={() => navigate("/milestone")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📊</span>Milestone</li>
-                <li onClick={handleHeightWeightCheck} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📏</span>BMI Check </li>
-                <li onClick={handleDownloadClick} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <FaArrowCircleDown size={30} />Download
-                </li>
-                <li onClick={loadHistory} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><FaHistory size={30} />History</li>
+                <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
+                <li onClick={loadHistory} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><FaHistory size={30} />Chat History</li>
                 <li onClick={() => navigate("/signin", { state: { lang: 'en' } })} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><LogOut size={30} />Sign Out</li>
             </ul>
             </div>
              {childInfo && (
-  <div className="fixed-child-info" style={{justifyContent: 'space-between', alignItems: 'center' }}>
+  <div className="fixed-child-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-  <span><strong>Child Name:</strong> {childInfo.name}</span>
-  <span><strong>Age in Months:</strong> {childInfo.age}</span>
-</div>
+      <span><strong>Child Name:</strong> {childInfo.name}</span>
+      <span><strong>Age in Months:</strong> {childInfo.age}</span>
+    </div>
 
-    {childList.length > 0 && (
-      <select
-        value={childInfo?.id || ''}
-        onChange={(e) => handleChildSwitch(e.target.value)}
-        style={{ padding: '6px', borderRadius: '6px', fontSize: '14px' }}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      {childList.length > 0 && (
+        <select
+          value={childInfo?.id || ''}
+          onChange={(e) => handleChildSwitch(e.target.value)}
+          style={{ padding: '6px', borderRadius: '6px', fontSize: '14px' }}
+        >
+          {childList.map(child => (
+            <option key={child.id} value={child.id}>
+              {child.name} ({child.age}m)
+            </option>
+          ))}
+        </select>
+      )}
+
+      {/* Download Button */}
+      <button
+        onClick={handleDownloadClick}
+        style={{
+    
+          color: 'black',
+          border: 'none',
+          padding: '6px 12px',
+          borderRadius: '6px',
+          fontSize: '14px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}
+        title="Download Chat"
       >
-        {childList.map(child => (
-          <option key={child.id} value={child.id}>
-            {child.name} ({child.age}m)
-          </option>
-        ))}
-      </select>
-    )}
+        <FaArrowCircleDown size={18} />
+        Download Chat
+      </button>
+    </div>
+
+
   </div>
 )}
 
