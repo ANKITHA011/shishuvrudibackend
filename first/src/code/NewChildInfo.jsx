@@ -144,7 +144,8 @@ function NewChildInfo() {
       if (response.ok) {
         const age = calculateAgeInMonths(child.date_of_birth);
         localStorage.setItem("childInfo", JSON.stringify({ ...child, phone, age }));
-        navigate("/child-info");
+        navigate("/chatbot", { state: { refresh: true } });
+
       } else {
         setErrors({ general: data.message || currentErrors.saveFailed });
       }

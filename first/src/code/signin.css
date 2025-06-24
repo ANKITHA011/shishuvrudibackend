@@ -1,6 +1,8 @@
 @import './colors.css';
+
 /* Main Wrappers */
-.main-wrapper1, .main-wrapper-two1 {
+.main-wrapper1,
+.main-wrapper-two1 {
   background-color: var(--white);
   border-radius: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
@@ -80,7 +82,7 @@
 .form-container h2 {
   font-size: 2rem;
   color: var(--font-color);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   text-align: center;
 }
 
@@ -98,10 +100,11 @@
   border: 1px solid #ccc;
   border-radius: 8px;
   transition: border-color 0.3s ease;
+
 }
 
 .input-row:focus-within {
-  border-color: var(--white)
+  border-color: var(--white);
 }
 
 .input-icon {
@@ -129,11 +132,15 @@
 }
 
 .field-error {
+  position: absolute;
+  left: calc(2.5rem + 1rem); /* ICON padding (2.5rem) + input padding-left (1rem) */
+  top: calc(100% + 4px);     /* Just below the input box */
   color: red;
   font-size: 0.85rem;
-  margin-top: 0.25rem;
-  height: 1rem;
+  line-height: 1;
+  white-space: nowrap;
 }
+
 
 .general-error {
   color: red;
@@ -154,11 +161,13 @@
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
-.signin-button:hover{
-  background-color:var(--primary-color)
+
+.signin-button:hover {
+  background-color: var(--primary-color);
 }
+
 .signin-button:disabled {
-  background-color:var(--primary-color);
+  background-color: var(--primary-color);
   cursor: not-allowed;
 }
 
@@ -236,14 +245,15 @@
     width: auto;
   }
 }
+
+/* Forgot Password */
 .forgot-password-text {
   text-align: right;
-  margin-top: 4px;
   font-size: 0.9rem;
 }
 
 .forgot-password-link {
-  color:var(--primary-color);
+  color: var(--primary-color);
   cursor: pointer;
   text-decoration: underline;
 }
@@ -251,15 +261,28 @@
 .forgot-password-link:hover {
   color: #0056b3;
 }
+
+/* Back Home Button */
 .back-home-button {
   background-color: transparent;
   border: none;
   color: black;
   font-size: 16px;
   cursor: pointer;
+  margin-top: 10px;;
   margin-left: 500px;
 }
 
 .back-home-button:hover {
   text-decoration: underline;
 }
+.input-wrapper .field-error {
+    position: absolute;
+    left: 2.5rem; /* !important is a last resort, but can confirm it's a specificity issue */
+    top: calc(100% + 4px);
+    color: red;
+    font-size: 0.85rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+

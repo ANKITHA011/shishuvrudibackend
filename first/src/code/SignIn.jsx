@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
-import translations from "./translations";
-import "./signin.css";
 import { IoMdHome } from "react-icons/io";
+import "./signin.css";
+import "./App.css";
 
 const CurveHeader = () => (
   <div className="curve-separator1">
@@ -21,47 +21,56 @@ const CurveHeader = () => (
 );
 
 function SignIn() {
-  const [form, setForm] = useState({ phone: "", password: "", language: "", role: "" });
+  const [form, setForm] = useState({
+    phone: "",
+    password: "",
+    role: "user",
+  });
+
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const phoneInputRef = useRef(null);
-
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const lang = location.state?.lang || "en";
-    setForm((prev) => ({ ...prev, language: lang }));
     phoneInputRef.current?.focus();
-  }, [location.state]);
-
-  const t = translations[form.language || "en"];
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    setErrors((prev) => ({ ...prev, [e.target.name]: "", general: "" }));
+    setErrors({ ...errors, [e.target.name]: "", general: "" });
   };
 
   const validateForm = () => {
     const temp = {};
-    if (!form.phone) temp.phone = t.errors.phoneRequired;
-    if (!form.password) temp.password = t.errors.passwordRequired;
-    if (!form.language) temp.language = t.errors.languageRequired;
-    setErrors(temp);
-    return Object.keys(temp).length === 0;
+    if (!form.phone) temp.phone = "Phone number is required.";
+    if (!form.password) temp.password = "Password is required.";
+    return temp;
   };
 
   const handleLogin = async () => {
-    if (!validateForm()) return;
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
     setLoading(true);
     try {
       await axios.post("http://localhost:5000/login/login", form);
       localStorage.setItem("phone", form.phone);
-      localStorage.setItem("language", form.language);
-      navigate("/child-info");
+      localStorage.setItem("role", form.role);
+
+      if (form.role === "doctor") {
+        navigate("/doctor-dashboard");
+      } else {
+        navigate("/child-info");
+      }
     } catch (err) {
-      const msg = err.response?.data?.message || t.errors.loginFailed;
+      const msg = err.response?.data?.message || "Login failed.";
       const field = err.response?.data?.field;
+
       if (field && (field === "phone" || field === "password")) {
         setErrors({ [field]: msg });
       } else {
@@ -84,56 +93,96 @@ function SignIn() {
 
         <div className="right-section1">
           <CurveHeader />
-          <button className="back-home-button" onClick={() => navigate("/", { state: { lang: form.language } })}>
-  <IoMdHome size={35}/>
-</button>
+          <button className="back-home-button" onClick={() => navigate("/")}>
+            <IoMdHome size={35} />
+          </button>
 
           <div className="signin-wrapper">
             <div className="form-container">
-              <h2>{t.title}</h2>
+              <h2>Sign In</h2>
 
-              {["phone", "password"].map((field) => (
-                <div key={field} className="input-wrapper">
-                  <div className="input-row">
-                    <span className="input-icon">{field === "phone" ? "📞" : "🔒"}</span>
-                    <input
-                      ref={field === "phone" ? phoneInputRef : null}
-                      type={field === "phone" ? "text" : "password"}
-                      name={field}
-                      placeholder={t[`${field}Placeholder`]}
-                      value={form[field]}
-                      onChange={handleChange}
-                      className={`custom-input ${errors[field] ? "input-error" : ""}`}
-                    />
-                  </div>
-                  {errors[field] && <div className="field-error">{errors[field]}</div>}
-
-                  {field === "password" && (
-                    <p className="forgot-password-text">
-                      <span
-                        className="forgot-password-link"
-                        onClick={() => navigate("/forgot-password", { state: { lang: form.language } })}
-                      >
-                        {t.forgotPassword || "Forgot Password?"}
-                      </span>
-                    </p>
-                  )}
+              {/* Role Selection at the Top */}
+              <div className="input-wrapper">
+                <div className="input-row">
+                  <span className="input-icon">🧑‍⚕️</span>
+                  <select
+                    name="role"
+                    value={form.role}
+                    onChange={handleChange}
+                    className={`custom-input ${errors.role ? "input-error" : ""}`}
+                  >
+                    <option value="user">Parent</option>
+                    <option value="doctor">Pediatrician</option>
+                  </select>
                 </div>
-              ))}
+                {errors.role && <div className="field-error">{errors.role}</div>}
+              </div>
 
+              {/* Phone Input */}
+              <div className="input-wrapper">
+                <div className="input-row">
+                  <span className="input-icon">📞</span>
+                  <input
+                    ref={phoneInputRef}
+                    type="text"
+                    name="phone"
+                    placeholder="Phone Number"
+                    value={form.phone}
+                    onChange={handleChange}
+                    className={`custom-input ${errors.phone ? "input-error" : ""}`}
+                  />
+                </div>
+                {errors.phone && <div className="field-error">{errors.phone}</div>}
+              </div>
+
+              {/* Password Input */}
+              <div className="input-wrapper">
+                <div className="input-row">
+                  <span className="input-icon">🔒</span>
+                  <input
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    value={form.password}
+                    onChange={handleChange}
+                    className={`custom-input ${errors.password ? "input-error" : ""}`}
+                  />
+                </div>
+                {errors.password && <div className="field-error">{errors.password}</div>}
+
+                {/* Forgot Password */}
+                <p className="forgot-password-text">
+                  <span
+                    className="forgot-password-link"
+                    onClick={() => navigate("/forgot-password")}
+                  >
+                    Forgot Password?
+                  </span>
+                </p>
+              </div>
+
+              {/* General Error */}
               {errors.general && <div className="general-error">{errors.general}</div>}
 
+              {/* Submit Button */}
               <button className="signin-button" onClick={handleLogin} disabled={loading}>
-                {loading ? `${t.signInButton}...` : t.signInButton}
+                {loading ? "Signing in..." : "Sign In"}
               </button>
 
+              {/* Sign Up Link */}
               <p className="signup-text">
-                {t.signupPrompt}{" "}
+                Don’t have an account?{" "}
                 <span
                   className="signup-link"
-                  onClick={() => navigate("/signup", { state: { lang: form.language } })}
+                  onClick={() => {
+                    if (form.role === "doctor") {
+                      navigate("/signup-doctor");
+                    } else {
+                      navigate("/signup");
+                    }
+                  }}
                 >
-                  {t.signupLink}
+                  Sign up as {form.role === "doctor" ? "Doctor" : "Parent"}
                 </span>
               </p>
             </div>

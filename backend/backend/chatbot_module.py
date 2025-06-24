@@ -6,34 +6,66 @@ from flask import Blueprint, request, jsonify
 import google.generativeai as genai
 import redis
 import mysql.connector
+import mysql.connector.pooling
 from langdetect import detect
 from deep_translator import GoogleTranslator
 from gtts import gTTS
 from datetime import datetime, timedelta
+import traceback
+from dateutil.relativedelta import relativedelta
 
 chatbot_bp = Blueprint("chatbot", __name__)
 
 # Configure Gemini API
-genai.configure(api_key="AIzaSyDO-nvH8fpcmru_FE61V9gpsU-nDOwaVko")
+genai.configure(api_key="AIzaSyDO-nvH8fpcmru_FE61GpsU-nDOwaVko") # Replace with your actual API key
 model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # Redis setup
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
 
-# MySQL setup
-conn = mysql.connector.connect(
-    host="localhost", user="root", password="root", database="chat_history"
-)
+# --- Consolidated Database Connection Pool Setup ---
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "root",
+    "database": "shishuvrridhhidb",
+    "pool_name": "chatbot_pool",
+    "pool_size": 10, # Increased pool size for better concurrency
+    "autocommit": False # Set to False for manual commit
+}
 
-#translator = Translator()
+connection_pool = None
 
-def detect_lang(text):
+try:
+    connection_pool = mysql.connector.pooling.MySQLConnectionPool(**db_config)
+    print("✅ MySQL Connection Pool created successfully.")
+except Exception as e:
+    print(f"❌ Critical Error: Could not create MySQL connection pool: {e}")
+    # In a real application, you might want to exit or handle this more gracefully
+    # if the database is essential for startup.
+    exit(1) # Exit if we can't establish a database connection pool
+
+def get_db_connection():
+    """Get a connection from the pool with automatic reconnection and proper error handling."""
+    if connection_pool is None:
+        raise Exception("Database connection pool is not initialized.")
+    conn = None
     try:
-        return detect(text)
-    except:
-        return 'en'
+        conn = connection_pool.get_connection()
+        # Verify the connection is alive and reconnect if necessary
+        if not conn.is_connected():
+            conn.reconnect()
+        return conn
+    except mysql.connector.Error as db_err:
+        print(f"❌ MySQL Error getting connection: {db_err}")
+        traceback.print_exc()
+        raise
+    except Exception as e:
+        print(f"❌ Unexpected error getting database connection: {e}")
+        traceback.print_exc()
+        raise
 
-from deep_translator import GoogleTranslator
+# --- Language Detection and Translation Functions ---
 
 def detect_lang(text):
     try:
@@ -62,7 +94,6 @@ def translate_from_en(text, lang):
             return text
     return text
 
-
 def generate_audio(text, lang='en'):
     try:
         tts = gTTS(text=text, lang=lang)
@@ -74,134 +105,65 @@ def generate_audio(text, lang='en'):
             return encoded
     except Exception as e:
         print("TTS error:", e)
+        traceback.print_exc()
         return None
 
-def get_history(name, age, phone):
+# --- Chat History Functions (Modified to use get_db_connection) ---
 
-    with conn.cursor(dictionary=True) as cursor:
-        cursor.execute("""
-            SELECT role, content, timestamp
-            FROM chat_history2
-            WHERE name=%s AND phone=%s
-            ORDER BY timestamp ASC
-        """, (name.lower(), phone))
-        history = cursor.fetchall()
-
-    for h in history:
-        if isinstance(h['timestamp'], datetime):
-            h['timestamp'] = h['timestamp'].strftime("%Y-%m-%d %H:%M:%S")
-    return history
-
-def save_message(name, age, phone, role, content):
-    with conn.cursor(dictionary=True) as cursor:
-        cursor.execute("""
-            INSERT INTO chat_history2 (name, age, phone, role, content)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (name.lower(), age, phone, role, content))
-        conn.commit()
-
-        cursor.execute("""
-            SELECT timestamp FROM chat_history2
-            WHERE name=%s AND age=%s AND phone=%s AND role=%s AND content=%s
-            ORDER BY id DESC LIMIT 1
-        """, (name.lower(), age, phone, role, content))
-        result = cursor.fetchone()
-
-    timestamp = result['timestamp'].strftime("%Y-%m-%d %H:%M:%S") if result else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-"""
-@chatbot_bp.route("/respond", methods=["POST"])
-def chatbot_response():
+def get_history(childid):
+    conn = None
     try:
-        data = request.json
-        message = data.get("message")
-        age = data.get("age")
-        gender = data.get("gender")
-        name = data.get("name")
-        phone = data.get("phone")
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT chatrole, content, createddate
+                FROM tblchat
+                WHERE chatchildid=%s
+                ORDER BY createddate ASC
+            """, (childid,))
+            history = cursor.fetchall()
 
-        if message == "__load_history__":
-            history = get_history(name, age, phone)
-            return jsonify({"history": history})
-
-        if message == "__load_history__preview__":
-            history = get_history(name, age, phone)
-            if not history:
-                return jsonify({"preview": None})
-            full_text = " ".join([msg["content"] for msg in history])
-            preview_words = " ".join(full_text.split()[:40]) + "..."
-            return jsonify({"preview": preview_words})
-
-        if message.startswith("__generate_summary__:"):
-            conversation_context = message.replace("__generate_summary__:", "").strip()
-
-            summary_prompt = (
-    f"Based on the previous conversation between a parent and an Early Childhood Development (ECD) expert about "
-    f"{name}, a {age}-month-old {gender}, write a brief, warm, and friendly welcome back message. "
-    f"The message should summarize the main topics discussed, highlight key points, and invite the parent to continue the conversation. "
-    f"Keep the tone conversational, supportive, and engaging.\n\n"
-    f"Previous conversation:\n{conversation_context}\n\n"
-    f"Create a welcoming message that acknowledges the prior discussion and encourages ongoing interaction:"
-)
-
-
-            response = model.generate_content(summary_prompt)
-            summary_response = response.text.strip()
-
-            translated_input, lang = translate_to_en(conversation_context[:100])
-            final_response = translate_from_en(summary_response, lang)
-
-            audio = generate_audio(final_response, lang)
-
-            return jsonify({
-                "response": final_response,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "audio": audio
-            })
-
-        translated_input, lang = translate_to_en(message)
-        save_message(name, age, phone, 'user', message)
-
-        history = get_history(name, age, phone)
-        conversation_history = ""
         for h in history:
-            role = "Parent" if h["role"] == "user" else "ECD Expert"
-            conversation_history += f"{role}: {h['content']}\n"
-
-        prompt = (
-            f"You are a certified Early Childhood Development expert and pediatric consultant. \n"
-            f"A parent is asking about their {age}-month-old {gender} child named {name}.\n"
-            f"Provide helpful, simple, age-appropriate guidance.\n\n"
-            "Provide a warm, evidence-based response that:\n"
-            "- Addresses their specific concern with empathy\n"
-            "- Offers practical, actionable advice\n",
-            "- Suggests when to consult a pediatrician if relevant\n"
-            "- remember the parent and child are from India"
-            "- Uses encouraging, supportive language\n\n"
-            f"limit the response to 50-100 words"
-            f"{conversation_history}"
-            f"Parent: {translated_input}\n"
-            f"ECD Expert:"
-        )
-
-        response = model.generate_content(prompt)
-        bot_response_en = response.text.strip()
-        bot_response = translate_from_en(bot_response_en, lang)
-
-        save_message(name, age, phone, 'model', bot_response)
-        audio = generate_audio(bot_response, lang)
-
-        return jsonify({
-            "response": bot_response,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "audio": audio
-        })
-
+            if isinstance(h['createddate'], datetime):
+                h['createddate'] = h['createddate'].strftime("%Y-%m-%d %H:%M:%S")
+        return history
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-"""
+        print(f"❌ Error in get_history for childid {childid}: {e}")
+        traceback.print_exc()
+        raise
+    finally:
+        if conn:
+            conn.close()
 
+def save_message(childid, chatrole, content):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                INSERT INTO tblchat (chatchildid, chatrole, content)
+                VALUES (%s, %s, %s)
+            """, (childid, chatrole, content))
+            conn.commit()
 
+            cursor.execute("""
+                SELECT createddate FROM tblchat
+                WHERE chatid = LAST_INSERT_ID()
+            """)
+            result = cursor.fetchone()
+            createddate = result['createddate'].strftime("%Y-%m-%d %H:%M:%S") if result else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return createddate
+    except Exception as e:
+        print(f"❌ Error in save_message for childid {childid}, role {chatrole}: {e}")
+        traceback.print_exc()
+        if conn:
+            conn.rollback() # Rollback on error
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+# --- Chatbot Response Route ---
 
 @chatbot_bp.route("/respond", methods=["POST"])
 def chatbot_response():
@@ -212,15 +174,14 @@ def chatbot_response():
         gender = data.get("gender")
         name = data.get("name")
         phone = data.get("phone")
+        childid = data.get("childid")
 
-        # Load full chat history
         if message == "__load_history__":
-            history = get_history(name, age, phone)
+            history = get_history(childid)
             return jsonify({"history": history})
 
-        # Generate a short summary (max 50 words) of chat history
         if message == "__load_history__preview__":
-            history = get_history(name, age, phone)
+            history = get_history(childid)
             if not history:
                 return jsonify({"preview": None})
 
@@ -239,7 +200,6 @@ def chatbot_response():
 
             return jsonify({"preview": short_summary})
 
-        # Generate a welcome message with summary of past conversation
         if message.startswith("__generate_summary__:"):
             conversation_context = message.replace("__generate_summary__:", "").strip()
 
@@ -255,7 +215,7 @@ def chatbot_response():
             response = model.generate_content(summary_prompt)
             summary_response = response.text.strip()
 
-            translated_input, lang = translate_to_en(conversation_context[:100])
+            translated_input, lang = translate_to_en(conversation_context[:100]) # Use context for lang detection
             final_response = translate_from_en(summary_response, lang)
 
             audio = generate_audio(final_response, lang)
@@ -268,25 +228,25 @@ def chatbot_response():
 
         # Normal user message handling
         translated_input, lang = translate_to_en(message)
-        save_message(name, age, phone, 'user', message)
+        user_message_timestamp = save_message(childid, 'user', message)
 
-        history = get_history(name, age, phone)
+        history = get_history(childid)
         conversation_history = ""
         for h in history:
-            role = "Parent" if h["role"] == "user" else "ECD Expert"
+            role = "Parent" if h["chatrole"] == "user" else "ECD Expert"
             conversation_history += f"{role}: {h['content']}\n"
 
         prompt = (
             f"You are a certified Early Childhood Development expert and pediatric consultant.\n"
             f"A parent is asking about their {age}-month-old {gender} child named {name}.\n"
             f"Provide helpful, simple, age-appropriate guidance.\n\n"
-            "Provide a evidence-based response that:\n"
+            "Provide an evidence-based response that:\n"
             "- Addresses their specific concern with empathy\n"
             "- Offers practical, actionable advice\n"
             "- Suggests when to consult a pediatrician if relevant\n"
             "- Remember the parent and child are from India\n"
             "- Uses encouraging, supportive language\n\n"
-            "-response should be point wise not a paragragh and easy to understand next point should begin in a new line\n"
+            "-response should be point wise not a paragraph and easy to understand next point should begin in a new line\n"
             f"Limit the response to 50-100 words\n"
             f"{conversation_history}"
             f"Parent: {translated_input}\n"
@@ -297,21 +257,21 @@ def chatbot_response():
         bot_response_en = response.text.strip()
         bot_response = translate_from_en(bot_response_en, lang)
 
-        save_message(name, age, phone, 'model', bot_response)
+        bot_message_timestamp = save_message(childid, 'model', bot_response)
         audio = generate_audio(bot_response, lang)
 
         return jsonify({
             "response": bot_response,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": bot_message_timestamp,
             "audio": audio
         })
 
     except Exception as e:
+        print(f"❌ Error in chatbot_response: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-from flask import request, jsonify
-from datetime import datetime
-#from your_db_connection import conn  # Replace with your actual DB connection import
+# --- Children Endpoints (Modified to use get_db_connection) ---
 
 @chatbot_bp.route("/children", methods=["POST"])
 def get_registered_children():
@@ -320,12 +280,14 @@ def get_registered_children():
     if not phone:
         return jsonify({"error": "Phone number is required"}), 400
 
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor(dictionary=True) as cursor:
             cursor.execute("""
-                SELECT id, name, gender, date_of_birth
-                FROM child_info1
-                WHERE phone = %s
+                SELECT childid, childname, childgender, childdateofbirth
+                FROM tblchildinfo
+                WHERE chlildparentphoneno = %s
             """, (phone,))
             children_data = cursor.fetchall()
 
@@ -333,267 +295,74 @@ def get_registered_children():
         children = []
 
         for child in children_data:
-            dob = child.get("date_of_birth")
+            dob = child.get("childdateofbirth")
             if dob:
-                # Convert to date if necessary
                 if isinstance(dob, str):
                     dob = datetime.strptime(dob, "%Y-%m-%d").date()
 
-                # Calculate age in months
-                age_in_months = (today.year - dob.year) * 12 + (today.month - dob.month)
-                if today.day < dob.day:
-                    age_in_months -= 1
+                age = relativedelta(today, dob)
+                age_str = f"{age.months} m, {age.days} d"
             else:
-                age_in_months = None
+                age_str = "Unknown"
 
             children.append({
-                "id": child["id"],
-                "name": child["name"],
-                "gender": child["gender"],
-                "age": age_in_months
+                "id": child["childid"],
+                "name": child["childname"],
+                "gender": child["childgender"],
+                "date_of_birth": str(child["childdateofbirth"]), # Ensure date is string for JSON
+                "age": age_str,
             })
 
         return jsonify(children)
     except Exception as e:
+        print(f"❌ Error in get_registered_children for phone {phone}: {e}")
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
+    finally:
+        if conn:
+            conn.close()
 
 @chatbot_bp.route("/children/<int:child_id>", methods=["DELETE"])
 def delete_child(child_id):
+    conn = None
     try:
+        conn = get_db_connection()
         with conn.cursor(dictionary=True) as cursor:
-            cursor.execute("DELETE FROM child_info1 WHERE id = %s", (child_id,))
+            cursor.execute("DELETE FROM tblchildinfo WHERE childid = %s", (child_id,))
             conn.commit()
         return jsonify({"message": "Child deleted successfully"}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@chatbot_bp.route("/children/<int:child_id>", methods=["PUT"])
-def update_child(child_id):
-    data = request.json
-    name = data.get("name")
-    age = data.get("age") # This 'age' is received as months
-    gender = data.get("gender")
-
-    updates = []
-    params = []
-
-    if name:
-        updates.append("name = %s")
-        params.append(name)
-
-    if gender:
-        updates.append("gender = %s")
-        params.append(gender)
-
-    if age is not None:
-        # Convert age in months back to a date_of_birth for the database
-        today = datetime.today().date()
-        # Approximate average days in a month to subtract
-        approx_days_in_month = 30.437
-        days_to_subtract = age * approx_days_in_month
-        date_of_birth = today - timedelta(days=days_to_subtract)
-        updates.append("date_of_birth = %s")
-        params.append(date_of_birth) # Store as date object
-
-    params.append(child_id)
-
-    try:
-        with conn.cursor(dictionary=True) as cursor:
-            sql = f"UPDATE child_info1 SET {', '.join(updates)} WHERE id = %s"
-            cursor.execute(sql, tuple(params))
-            conn.commit()
-        return jsonify({"message": "Child updated successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-from flask import request, jsonify
-import re
-
-@chatbot_bp.route('/get_milestones', methods=['POST'])
-def get_milestones():
-    data = request.json
-    name = data.get("name")
-    age = data.get("age")
-    phone = data.get("phone")
-
-    # Use this prompt to get questions in the right format
-    prompt = (
-        "You are a child development expert chatbot.\n"
-        f"List 5 important developmental milestones for a {age}-month-old baby. "
-        "For each one, write it as a short,clear and supportive question a pediatrician might ask a parent during a routine visit. "
-        "Keep the language simple, warm, and easy to answer with 'Yes', 'No', or 'Don't Know'. "
-        "Number each question (e.g., 1. … 2. …)"
-    )
-
-    def clean_and_extract_question(line):
-        # Remove leading number (e.g., "1. ", "2)")
-        line = re.sub(r'^\d+[\.\)]\s*', '', line)
-        # Remove bolded headers like "**Eye Contact:**"
-        line = re.sub(r'\*\*[^:*]+:\*\*', '', line)
-        # Remove quotes around the question
-        line = line.strip(' "“”')
-        return line.strip()
-
-    try:
-        # Generate milestone questions using the model
-        response = model.generate_content(prompt)
-        lines = response.text.strip().split('\n')
-
-        # Clean and filter only proper question lines
-        milestones = [clean_and_extract_question(line) for line in lines if '?' in line]
-
-        # Save to DB
-        cursor = conn.cursor()
-        for question in milestones:
-            cursor.execute("""
-                INSERT INTO milestones (name, age, phone, question, answer, timestamp)
-                VALUES (%s, %s, %s, %s, NULL, NOW())
-            """, (name, age, phone, question))
-        conn.commit()
-
-        return jsonify({"milestones": milestones})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-import traceback
-
-@chatbot_bp.route('/submit_milestones', methods=['POST'])
-def submit_milestones():
-    data = request.json
-    name = data.get("name")
-    age = data.get("age")
-    phone = data.get("phone")
-    answers = data.get("answers")
-
-    try:
-        cursor = conn.cursor()
-        for item in answers:
-            cursor.execute("""
-                UPDATE milestones
-                SET answer = %s, timestamp = NOW()
-                WHERE name = %s AND age = %s AND phone = %s AND question = %s
-            """, (item["answer"], name, age, phone, item["question"]))
-        conn.commit()
-
-        # ✅ Fetch ALL answered milestones from DB (past + new)
-        cursor.execute("""
-            SELECT question, answer FROM milestones
-            WHERE name = %s AND phone = %s AND answer IS NOT NULL
-        """, (name, phone))
-        all_answers = cursor.fetchall()
-
-
-        # Build summary
-        summary = "\n".join([f"Q: {row[0]}\nA: {row[1]}" for row in all_answers])
-
-        num_no = sum(1 for row in all_answers if row[1].strip().lower() == "no")
-        num_dk = sum(1 for row in all_answers if row[1].strip().lower() == "don't know")
-
-        if num_no == 0 and num_dk <= 1:
-            concern = "Your child appears to be developing normally for their age."
-        elif num_no <= 2:
-            concern = "Your child may be slightly behind on some milestones. It’s okay to wait and watch, but if you're concerned, consult a pediatrician."
-        else:
-            concern = "Several milestones were not met. It is recommended to consult a pediatrician for further evaluation."
-
-        # Prompt for Gemini
-        prompt = (
-            f"You are an early childhood development expert.\n\n"
-            f"A parent has answered milestone screening questions about their {age}-month-old child named {name}. "
-            f"Based on all the answers below, give 3–4 warm, simple, overall recommendations to help support the child’s growth. "
-            f"Make the advice easy for any parent to follow at home. "
-            f"Keep the total response between 50 and 80 words. "
-            f"Don't write one recommendation per question — instead, give general advice based on the overall answers.\n\n"
-            f"{summary}\n\n"
-            f"Recommendations:"
-        )
-
-        print("Prompt to Gemini:\n", prompt)  # Debug prompt
-
-        response = model.generate_content(prompt)
-        recommendations = response.text.strip()
-
-        return jsonify({
-            "message": "Responses saved successfully.",
-            "recommendation": recommendations,
-            "concern": concern
-        })
-
-    except Exception as e:
-        print("Error in /submit_milestones:")
+        print(f"❌ Error in delete_child for child_id {child_id}: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
-
-@chatbot_bp.route('/get_milestone_responses', methods=['POST'])
-def get_milestone_responses():
-    data = request.json
-    name = data.get("name")
-    phone = data.get("phone")
-
-    try:
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT question, answer, timestamp
-            FROM milestones
-            WHERE name = %s AND phone = %s AND answer IS NOT NULL
-            ORDER BY timestamp ASC
-        """, (name, phone))
-        rows = cursor.fetchall()
-        grouped = {}
-        for row in rows:
-            q = row["question"]
-            if q not in grouped:
-                grouped[q] = []
-            grouped[q].append({
-                "answer": row["answer"],
-                "timestamp": row["timestamp"].strftime("%Y-%m-%d")
-            })
-
-        return jsonify({"milestone_responses": grouped})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@chatbot_bp.route("/get_parent_name", methods=["POST"])
-def get_parent_name():
-    data = request.json
-    phone = data.get("phone")
-    if not phone:
-        return jsonify({"error": "Phone number is required"}), 400
-
-    try:
-        with conn.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT parent_name FROM users WHERE phone = %s", (phone,))
-            user = cursor.fetchone()
-
-        if user:
-            return jsonify({"parent_name": user["parent_name"]}) # Changed 'name' to 'parent_name'
-        else:
-            return jsonify({"parent_name": None})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
-from flask import Blueprint, request, jsonify
-import traceback
-# Assuming 'conn' and 'get_ideal_ranges' and 'model' (for Gemini) are imported/defined elsewhere
-
+# --- Child Assessment Endpoints (Modified to use get_db_connection) ---
 
 def get_ideal_ranges(age_months, gender=None):
-    # Simplified ideal ranges, modify as needed
-    if 0 <= age_months <= 3:
-        return {"height_min": 45, "height_max": 65, "weight_min": 2.5, "weight_max": 7}
-    elif 4 <= age_months <= 6:
-        return {"height_min": 55, "height_max": 75, "weight_min": 5, "weight_max": 9.5}
-    elif 7 <= age_months <= 9:
-        return {"height_min": 60, "height_max": 80, "weight_min": 6.5, "weight_max": 11}
-    elif 10 <= age_months <= 12:
-        return {"height_min": 65, "height_max": 85, "weight_min": 7.5, "weight_max": 12.5}
-    else:
-        return {"height_min": 40, "height_max": 85, "weight_min": 2, "weight_max": 15}
+    # Month-specific ideal values for 0-12 months (you can fine-tune these based on real growth data)
+    month_data = {
+        0: {"height_min": 45, "height_max": 52, "weight_min": 2.5, "weight_max": 4.0},
+        1: {"height_min": 50, "height_max": 56, "weight_min": 3.0, "weight_max": 5.0},
+        2: {"height_min": 52, "height_max": 58, "weight_min": 3.5, "weight_max": 5.8},
+        3: {"height_min": 54, "height_max": 61, "weight_min": 4.0, "weight_max": 6.5},
+        4: {"height_min": 56, "height_max": 63, "weight_min": 4.5, "weight_max": 7.0},
+        5: {"height_min": 58, "height_max": 65, "weight_min": 5.0, "weight_max": 7.5},
+        6: {"height_min": 60, "height_max": 67, "weight_min": 5.5, "weight_max": 8.0},
+        7: {"height_min": 61, "height_max": 68, "weight_min": 6.0, "weight_max": 8.5},
+        8: {"height_min": 62, "height_max": 69, "weight_min": 6.2, "weight_max": 9.0},
+        9: {"height_min": 63, "height_max": 70, "weight_min": 6.4, "weight_max": 9.3},
+        10: {"height_min": 64, "height_max": 71, "weight_min": 6.6, "weight_max": 9.6},
+        11: {"height_min": 65, "height_max": 73, "weight_min": 6.8, "weight_max": 10.0},
+        12: {"height_min": 66, "height_max": 75, "weight_min": 7.0, "weight_max": 10.5}
+    }
 
+    # Default fallback range if age out of bounds
+    default_range = {"height_min": 45, "height_max": 85, "weight_min": 2.0, "weight_max": 15.0}
+
+    return month_data.get(age_months, default_range)
 
 
 @chatbot_bp.route("/child_assessment", methods=["POST", "OPTIONS"])
@@ -606,6 +375,7 @@ def child_assessment():
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response
 
+    conn = None
     try:
         data = request.get_json()
         if data is None:
@@ -614,8 +384,9 @@ def child_assessment():
             return response, 400
 
         name = data.get("name", "the child")
-        phone = data.get("phone")
-        gender = data.get("gender")  # optional
+        gender = data.get("gender")
+        child_id = data.get("id")
+
         try:
             age_months = int(data.get("age"))
             height_cm = float(data.get("height"))
@@ -625,9 +396,8 @@ def child_assessment():
             response.headers.add("Access-Control-Allow-Origin", "*")
             return response, 400
 
-        # Validate required fields
-        if not phone:
-            response = jsonify({"error": "Phone number is required"})
+        if not child_id:
+            response = jsonify({"error": "Child ID is required for assessment"})
             response.headers.add("Access-Control-Allow-Origin", "*")
             return response, 400
 
@@ -642,6 +412,7 @@ def child_assessment():
         ideal_weight_min = ideal_ranges["weight_min"]
         ideal_weight_max = ideal_ranges["weight_max"]
 
+        # Validate input against a reasonable range (allow some buffer)
         if not (ideal_height_min <= height_cm <= ideal_height_max + 10):
             response = jsonify({
                 "error": f"Height must be between {ideal_height_min} and {ideal_height_max + 10} cm"
@@ -672,19 +443,13 @@ def child_assessment():
             weight_status = "within the ideal range"
 
         # Insert into DB
-        try:
-            cursor = conn.cursor()
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO child_measurements (name, phone, height_cm, weight_kg)
-                VALUES (%s, %s, %s, %s)
-            """, (name, phone, height_cm, weight_kg))
+                INSERT INTO tblcgm (cgmchildid,cgmheightcm, cgmweightkg)
+                VALUES (%s, %s, %s)
+            """, (child_id, height_cm, weight_kg))
             conn.commit()
-            cursor.close()
-        except Exception as db_error:
-            print(f"DB insert error: {db_error}")
-            response = jsonify({"error": "Database insert failed"})
-            response.headers.add("Access-Control-Allow-Origin", "*")
-            return response, 500
 
         # Generate recommendation
         recommendation = ""
@@ -712,7 +477,7 @@ def child_assessment():
                 )
             prompt_parts.append(
                 "Please provide a simple short, empathetic, and actionable suggestion for the parent on what to do "
-                "to help the child maintain or reach ideal height and weight. Keep the response concise (50-100 words)."
+                "to help the child maintain or reach ideal height and weight. Keep the response concise (30-40 words)."
             )
             gemini_prompt = " ".join(prompt_parts)
 
@@ -721,6 +486,7 @@ def child_assessment():
                 recommendation = gemini_response.text.strip()
             except Exception as gemini_e:
                 print(f"Gemini API error: {gemini_e}")
+                traceback.print_exc()
                 recommendation = (
                     "We're unable to generate a personalized recommendation right now. "
                     "Please consult your pediatrician for a detailed assessment and guidance."
@@ -752,32 +518,395 @@ def child_assessment():
         response = jsonify({"error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", "*")
         return response, 500
+    finally:
+        if conn:
+            conn.close()
 
 @chatbot_bp.route("/child_assessments", methods=["GET"])
 def get_child_assessments():
-    phone = request.args.get("phone")
-    name = request.args.get("name")
+    child_id = request.args.get("id")
 
-    if not phone or not name:
-        return jsonify({"error": "Both phone and name are required"}), 400
+    if not child_id:
+        return jsonify({"error": "Child ID is required to fetch assessments"}), 400
 
+    conn = None
     try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT height_cm, weight_kg,assessment_date
-            FROM child_measurements
-            WHERE phone = %s AND name = %s
-            ORDER BY assessment_date DESC
-        """, (phone, name))
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT cgmheightcm, cgmweightkg, cgmdate
+                FROM tblcgm
+                WHERE cgmchildid = %s
+                ORDER BY cgmdate DESC
+            """, (child_id,))
 
-        results = cursor.fetchall()
-        assessments = [{"height_cm": row[0], "weight_kg": row[1],"assessment_date": row[2]} for row in results]
-
-        cursor.close()
+            results = cursor.fetchall()
+            assessments = [{"height_cm": row[0], "weight_kg": row[1],"assessment_date": str(row[2])} for row in results] # Ensure date is string
 
         response = jsonify(assessments)
         response.headers.add("Access-Control-Allow-Origin", "*")
         return response
     except Exception as e:
+        print(f"❌ Error in get_child_assessments for child_id {child_id}: {e}")
         traceback.print_exc()
         return jsonify({"error": "Failed to retrieve assessments"}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# --- Parent Name Endpoint (Modified to use get_db_connection) ---
+
+@chatbot_bp.route("/get_parent_name", methods=["POST"])
+def get_parent_name():
+    data = request.json
+    phone = data.get("phone")
+    print(f"Received phone number for parent name: {phone}")
+
+    if not phone:
+        print("Phone number missing from request.")
+        return jsonify({"error": "Phone number is required"}), 400
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute(
+                "SELECT userparentname FROM tblusers WHERE userphoneno = %s",
+                (phone,)
+            )
+            user = cursor.fetchone()
+            print(f"Database query result (user): {user}")
+
+        if user:
+            parent_name = user.get("userparentname")
+            print(f"Fetched parent name from DB: {parent_name}")
+            return jsonify({"parent_name": parent_name})
+        else:
+            print(f"No user found for phone number: {phone}")
+            return jsonify({"parent_name": None})
+
+    except Exception as e:
+        print(f"❌ Error in get_parent_name for phone {phone}: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "error": "Internal server error",
+            "details": str(e)
+        }), 500
+    finally:
+        if conn:
+            conn.close()
+
+# --- Doctor Endpoints (Modified to use get_db_connection) ---
+
+@chatbot_bp.route("/doctors", methods=["GET"])
+def get_available_doctors():
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT doctor_id, doctor_name, email_id, phone_number
+                FROM doctor
+            """)
+            doctors = cursor.fetchall()
+        return jsonify(doctors)
+    except Exception as e:
+        print(f"❌ Error in get_available_doctors: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@chatbot_bp.route("/doctor_chat", methods=["POST"])
+def doctor_chat():
+    conn = None
+    try:
+        data = request.json
+        parent_id = data.get("parent_id")
+        doctor_id = data.get("doctor_id")
+        message = data.get("message")
+        is_doctor = data.get("is_doctor", False)
+
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                INSERT INTO doctor_chat (parent_id, doctor_id, message, is_doctor)
+                VALUES (%s, %s, %s, %s)
+            """, (parent_id, doctor_id, message, is_doctor))
+            conn.commit()
+
+            cursor.execute("""
+                SELECT created_at FROM doctor_chat
+                WHERE id = LAST_INSERT_ID()
+            """)
+            result = cursor.fetchone()
+            timestamp = result['created_at'].strftime("%Y-%m-%d %H:%M:%S") if result else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        return jsonify({
+            "status": "success",
+            "timestamp": timestamp
+        })
+    except Exception as e:
+        print(f"❌ Error in doctor_chat for parent {parent_id}, doctor {doctor_id}: {e}")
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@chatbot_bp.route("/doctor_chat_history", methods=["POST"])
+def get_doctor_chat_history():
+    conn = None
+    try:
+        data = request.json
+        parent_id = data.get("parent_id")
+        doctor_id = data.get("doctor_id")
+
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT message, is_doctor, created_at
+                FROM doctor_chat
+                WHERE parent_id = %s AND doctor_id = %s
+                ORDER BY created_at ASC
+            """, (parent_id, doctor_id))
+            history = cursor.fetchall()
+
+        formatted_history = []
+        for h in history:
+            formatted_history.append({
+                "sender": "Doctor" if h['is_doctor'] else "You",
+                "message": h['message'],
+                "timestamp": h['created_at'].strftime("%Y-%m-%d %H:%M:%S")
+            })
+
+        return jsonify({
+            "history": formatted_history
+        })
+    except Exception as e:
+        print(f"❌ Error in get_doctor_chat_history for parent {parent_id}, doctor {doctor_id}: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+# --- Notification Endpoints (Modified to use get_db_connection) ---
+
+@chatbot_bp.route('/notifications/<doctor_phone>', methods=['GET'])
+def get_notifications(doctor_phone):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            # Assuming 'notifications' table exists and stores doctor_phone
+            # If notifications are linked via doctor_id, you'd need a JOIN or a prior lookup
+            cursor.execute("""
+                SELECT child_id, child_name, parent_name, timestamp
+                FROM notifications
+                WHERE doctor_phone = %s
+                ORDER BY timestamp DESC
+            """, (doctor_phone,))
+            notifications = cursor.fetchall()
+        return jsonify(notifications)
+    except Exception as e:
+        print(f"❌ Error fetching notifications for doctor_phone {doctor_phone}: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@chatbot_bp.route('/create_chat_notification', methods=['POST'])
+def create_chat_notification():
+    data = request.json
+    conn = None
+    try:
+        child_id = data['child_id']
+        doctor_id = data['doctor_id']
+        created_date = datetime.now()
+
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO tblchatnotification
+                (chatnotichildid, chatnotidoctorid, chatnotiseenbydoctor, chatnotiactionatkenbydoctor, createddate)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (child_id, doctor_id, "no", "no", created_date))
+            conn.commit()
+        return jsonify({"status": "success", "message": "Notification created"}), 201
+    except Exception as e:
+        print(f"❌ Failed to create chat notification for child {child_id}, doctor {doctor_id}: {e}")
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@chatbot_bp.route('/chatbot/notifications/<doctor_id>', methods=['GET'])
+def get_chat_notifications(doctor_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT
+                    chatnotichildid AS child_id,
+                    createddate AS timestamp,
+                    chatnotiseenbydoctor,
+                    chatnotiactionatkenbydoctor
+                FROM tblchatnotification
+                WHERE chatnotidoctorid = %s
+                ORDER BY createddate DESC
+            """, (doctor_id,))
+            notifications = cursor.fetchall()
+        return jsonify(notifications)
+    except Exception as e:
+        print(f"❌ Error fetching chat notifications for doctor {doctor_id}: {e}")
+        traceback.print_exc()
+        return jsonify([]), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@chatbot_bp.route('/chatbot/mark_seen', methods=['POST'])
+def mark_notification_seen():
+    data = request.json
+    conn = None
+    try:
+        child_id = data['child_id']
+        doctor_id = data['doctor_id']
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE tblchatnotification
+                SET chatnotiseenbydoctor = 'yes', chatnotiactionatkenbydoctor = 'yes'
+                WHERE chatnotichildid = %s AND chatnotidoctorid = %s
+            """, (child_id, doctor_id))
+            conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        print(f"❌ Error updating notification status for child {child_id}, doctor {doctor_id}: {e}")
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+
+@chatbot_bp.route('/doctor_name/<phone>', methods=['GET'])
+def get_doctor_name(phone):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("SELECT doctor_name FROM doctor WHERE phone_number = %s", (phone,))
+            result = cursor.fetchone()
+        return jsonify(result or {})
+    except Exception as e:
+        print(f"❌ Error fetching doctor name for phone {phone}: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+from flask import jsonify, request
+from datetime import datetime
+import traceback
+
+# Your existing imports and setup assumed...
+
+@chatbot_bp.route('/child/info/<child_id>', methods=['GET'])
+def get_child_info(child_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT childname, childgender, childdateofbirth
+                FROM tblchildinfo
+                WHERE childid = %s
+            """, (child_id,))
+            child = cursor.fetchone()
+
+            if not child:
+                return jsonify({"error": "Child not found"}), 404
+
+            dob = child.get('childdateofbirth')
+            if dob:
+                if isinstance(dob, str):
+                    dob = datetime.strptime(dob, "%Y-%m-%d").date()
+                today = datetime.now().date()
+                age = relativedelta(today, dob)
+                age_string = f"{age.months} m {age.days} d"
+            else:
+                age_string = "Unknown"
+
+            response = {
+                "name": child['childname'],
+                "age": age_string,
+                "gender": child['childgender'],
+                "dateOfBirth": dob.isoformat() if dob else None
+            }
+            return jsonify(response)
+
+    except Exception as e:
+        print(f"❌ Error fetching child info for child {child_id}: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
+@chatbot_bp.route('/notification/action_taken', methods=['POST'])
+def update_action_taken():
+    data = request.get_json()
+    child_id = data.get("child_id")
+    doctor_id = data.get("doctor_id")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE tblchatnotification
+                SET chatnotiactionatkenbydoctor = 'yes'
+                WHERE chatnotichildid = %s AND chatnotidoctorid = %s
+            """, (child_id, doctor_id))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"❌ Error updating action_taken: {e}")
+        return jsonify({"success": False}), 500
+    finally:
+        if conn:
+            conn.close()
+@chatbot_bp.route('/notification/mark_seen', methods=['POST'])
+def update_seen():
+    data = request.get_json()
+    child_id = data.get("child_id")
+    doctor_id = data.get("doctor_id")
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE tblchatnotification
+                SET chatnotiseenbydoctor = 'yes'
+                WHERE chatnotichildid = %s AND chatnotidoctorid = %s
+            """, (child_id, doctor_id))
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"❌ Error updating seen status: {e}")
+        return jsonify({"success": False}), 500
+    finally:
+        if conn:
+            conn.close()

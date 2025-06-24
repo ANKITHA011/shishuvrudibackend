@@ -827,3 +827,20 @@ margin-top: 20px;}
 .child-table {
   table-layout: auto;
 }
+.age-inline {
+display: flex;
+gap: 6px;
+flex-wrap: nowrap;
+white-space: nowrap;
+font-weight: 600;
+font-size: 0.9rem;
+color: #374151;
+}
+.age-display {
+display: inline-flex;
+gap: 6px;
+white-space: nowrap;
+font-weight: 600;
+font-size: 0.9rem;
+color: #374151;
+}

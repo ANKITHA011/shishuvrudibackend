@@ -41,7 +41,7 @@ def request_otp():
             return send_response("otp_invalid", 400, lang=lang)
 
         cur = mysql.connection.cursor()
-        cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
+        cur.execute("SELECT userid FROM tblusers WHERE userphoneno = %s", (phone,))
         if cur.fetchone():
             cur.close()
             return send_response("otp_exists", 409, lang=lang)
@@ -105,13 +105,13 @@ def create_account():
             return send_response("account_invalid_password", 400, lang=lang)
 
         cur = mysql.connection.cursor()
-        cur.execute("SELECT id FROM users WHERE phone = %s", (phone,))
+        cur.execute("SELECT userid FROM tblusers WHERE userphoneno = %s", (phone,))
         if cur.fetchone():
             cur.close()
             return send_response("account_exists", 409, lang=lang)
 
         #hashed_password = generate_password_hash(password)
-        cur.execute("""INSERT INTO users (phone, password, parent_name, relation, role)
+        cur.execute("""INSERT INTO tblusers (userphoneno, userpassword, userparentname, userrelation, userrole)
                        VALUES (%s, %s, %s, %s, %s)""", (phone, password, parent_name, relation, role))
         mysql.connection.commit()
         cur.close()
@@ -131,6 +131,7 @@ def login():
 
         phone = data.get("phone", "").strip()
         password = data.get("password", "").strip()
+        role = data.get("role", "user").strip()
 
         if not phone or not password:
             return send_response("login_required", 400, field="phone_password", lang=lang)
@@ -139,13 +140,20 @@ def login():
             return send_response("account_invalid_phone", 400, field="phone", lang=lang)
 
         cur = mysql.connection.cursor()
-        cur.execute("SELECT password FROM users WHERE phone = %s", (phone,))
+
+        if role == "doctor":
+            cur.execute("SELECT password FROM doctor WHERE phone_number = %s", (phone,))
+        else:
+            cur.execute("SELECT userpassword FROM tblusers WHERE userphoneno = %s", (phone,))
+
         user = cur.fetchone()
         cur.close()
 
         if not user:
             return send_response("login_not_registered", 401, field="phone", lang=lang)
 
+        # 🔐 Optional: check hashed password
+        # if not check_password_hash(user[0], password):
         if user[0] != password:
             return send_response("login_wrong_password", 401, field="password", lang=lang)
 
@@ -156,23 +164,25 @@ def login():
         return send_response("login_error", 500, lang=get_lang())
 
 
-
 from datetime import datetime
 from dateutil.relativedelta import relativedelta  # install via pip if needed
 
-def calculate_age(dob_str):
-    """Calculate age in months from date_of_birth string (YYYY-MM-DD)."""
-    dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
-    today = datetime.today().date()
 
-    difference = relativedelta(today, dob)
-    age_in_months = difference.years * 12 + difference.months
 
-    return age_in_months
+def calculate_age(date_of_birth):
+    birth_date = datetime.strptime(date_of_birth, "%Y-%m-%d")
+    today = datetime.today()
+    return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+
+
+
+from flask import request, jsonify
+from datetime import datetime
 
 @login_signup_bp.route('/save_child_info', methods=['POST'])
 def save_child_info():
     data = request.get_json()
+
     name = data.get('name')
     date_of_birth = data.get('date_of_birth')
     gender = data.get('gender')
@@ -188,25 +198,43 @@ def save_child_info():
 
         cursor = mysql.connection.cursor()
 
-        # Insert into child_info1
+        # ✅ Get the highest childid suffix used for this parent
         cursor.execute("""
-            INSERT INTO child_info1 (name, date_of_birth, phone, gender, age)
+            SELECT MAX(CAST(SUBSTRING(childid, LENGTH(%s) + 1) AS UNSIGNED)) 
+            FROM tblchildinfo 
+            WHERE chlildparentphoneno = %s
+        """, (phone, phone))
+        result = cursor.fetchone()
+        max_suffix = result[0] if result[0] is not None else 0
+
+        # ✅ Increment to next suffix
+        next_suffix = max_suffix + 1
+        childid = f"{phone}{str(next_suffix).zfill(4)}"
+
+        # ✅ Insert into tblchildinfo
+        cursor.execute("""
+            INSERT INTO tblchildinfo (childid, childname, childdateofbirth, chlildparentphoneno, childgender)
             VALUES (%s, %s, %s, %s, %s)
-        """, (name, date_of_birth, phone, gender, age))
+        """, (childid, name, date_of_birth, phone, gender))
         mysql.connection.commit()
 
-        # Optional insert into child_measurements
+        # ✅ Optionally insert measurements
         if height and weight:
             cursor.execute("""
-                INSERT INTO child_measurements (name, phone, height_cm, weight_kg)
-                VALUES (%s, %s, %s, %s)
-            """, (name, phone, height, weight))
+                INSERT INTO tblcgm (cgmchildid,cgmheightcm, cgmweightkg)
+                VALUES (%s, %s, %s)
+            """, (childid, height, weight))
             mysql.connection.commit()
 
         cursor.close()
-        return jsonify({"message": "Child info saved successfully"}), 200
+
+        return jsonify({
+            "message": "Child info saved successfully",
+            "childid": childid,
+            "age_in_months": age
+        }), 200
+
     except Exception as e:
-        import traceback
         print(f"Database error: {e}")
         traceback.print_exc()
         return jsonify({"message": "Failed to save child info"}), 500

@@ -378,6 +378,7 @@ margin-bottom: 0.75rem;
     z-index: 60;
     gap: 10px;
     padding-left: 220px;
+    
 }
 
 .input-row input {
@@ -627,6 +628,7 @@ margin-bottom: 0.75rem;
         flex-direction: row;
         padding: 12px 15px;
         padding-left: 15px;
+    
     }
 
     .input-row input {
@@ -739,7 +741,8 @@ body {
 .page-layout {
     display: flex;
     min-height: 100vh;
-    background-color: #1a1a2e; /* Ensure the main layout also has the dark background */
+    background-color: white;
+ /* Ensure the main layout also has the dark background */
 }
 
 

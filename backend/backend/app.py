@@ -8,6 +8,7 @@ import requests
 from login_signup import login_signup_bp, init_mysql
 from chatbot_module import chatbot_bp
 from chatwithoutsign import chat_without_signin_bp
+from milestone import milestone_bp
 
 # Flask App Initialization
 app = Flask(__name__)
@@ -17,7 +18,7 @@ CORS(app)  # Enable CORS for all routes
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'root'
-app.config['MYSQL_DB'] = 'chat_history'
+app.config['MYSQL_DB'] = 'shishuvrridhhidb'
 
 # Initialize MySQL
 mysql = MySQL(app)
@@ -27,6 +28,7 @@ init_mysql(mysql)
 app.register_blueprint(login_signup_bp, url_prefix="/login")
 app.register_blueprint(chatbot_bp, url_prefix="/chatbot")
 app.register_blueprint(chat_without_signin_bp)
+app.register_blueprint(milestone_bp, url_prefix="/milestone")
 
 # Region-to-language mapping
 REGION_LANGUAGE_MAP = {

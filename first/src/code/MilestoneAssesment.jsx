@@ -1,3 +1,5 @@
+// MilestoneAssessment.jsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Award, ArrowLeft, LogOut } from "lucide-react";
@@ -5,49 +7,52 @@ import "./milestone.css";
 import { IoMdHome } from "react-icons/io";
 import { PiBabyBold } from "react-icons/pi";
 import { IoChatbubbleEllipsesSharp } from "react-icons/io5";
-import axios from 'axios';
+import axios from "axios";
 
 function MilestoneAssessment() {
   const [milestones, setMilestones] = useState([]);
   const [responses, setResponses] = useState({});
   const [pastResponses, setPastResponses] = useState({});
   const [recommendation, setRecommendation] = useState(null);
-  const [concern, setConcern] = useState(null); // New state for concern
+  const [concern, setConcern] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false); // State to control history view
+
+  // Pagination states for history
+  const [currentPage, setCurrentPage] = useState(1);
+  const sessionsPerPage = 6; // Number of sessions to display per page
+
   const [childInfo, setChildInfo] = useState(JSON.parse(localStorage.getItem("childInfo")));
   const [parentName, setParentName] = useState(localStorage.getItem("parentName") || null);
   const [childList, setChildList] = useState(JSON.parse(localStorage.getItem("childList")) || []);
 
+  const [region, setRegion] = useState("");
+  const [country, setCountry] = useState("");
+
   const navigate = useNavigate();
 
-  const loadHistory = () => {
-    navigate("/history");
-  };
+  useEffect(() => {
+    axios.get("http://localhost:5000/api/userinfo")
+      .then(res => {
+        setRegion(res.data.region);
+        setCountry(res.data.country);
+      })
+      .catch(err => {
+        console.error("Error fetching user info:", err);
+      });
+  }, []);
 
-  // Effect to load parent name and child list
   useEffect(() => {
     const info = JSON.parse(localStorage.getItem("childInfo"));
     setChildInfo(info);
-
-    // Set parent name from localStorage immediately to avoid "Loading..."
     const cachedParentName = localStorage.getItem("parentName");
-    if (cachedParentName) {
-      setParentName(cachedParentName);
-    }
-
-    // Set child list from localStorage immediately
+    if (cachedParentName) setParentName(cachedParentName);
     const cachedChildList = JSON.parse(localStorage.getItem("childList"));
-    if (cachedChildList) {
-      setChildList(cachedChildList);
-    }
-
-    if (info?.phone) {
-      fetchParentName(info.phone);
-    }
+    if (cachedChildList) setChildList(cachedChildList);
+    if (info?.phone) fetchParentName(info.phone);
   }, []);
 
-  // Effect to fetch milestones and past responses (depends on childInfo)
   useEffect(() => {
     if (!childInfo) {
       setIsLoading(false);
@@ -56,32 +61,32 @@ function MilestoneAssessment() {
 
     setIsLoading(true);
 
-    fetch("http://localhost:5000/chatbot/get_milestones", {
+    fetch("http://localhost:5000/milestone/get_milestones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: childInfo.name,
         age: childInfo.age,
         phone: childInfo.phone,
+        childid: childInfo.id,
       }),
     })
       .then((res) => res.json())
       .then((data) => setMilestones(data.milestones || []))
       .catch((err) => console.error("Error fetching milestones:", err));
 
-    fetch("http://localhost:5000/chatbot/get_milestone_responses", {
+    fetch("http://localhost:5000/milestone/get_milestone_responses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: childInfo.name,
         phone: childInfo.phone,
+        childid: childInfo.id,
       }),
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data.milestone_responses) {
-          setPastResponses(data.milestone_responses);
-        }
+        if (data.milestone_responses) setPastResponses(data.milestone_responses);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -92,10 +97,9 @@ function MilestoneAssessment() {
 
   const fetchParentName = async (phoneNumber) => {
     try {
-      const res = await axios.post("http://localhost:5000/chatbot/get_parent_name", { phone: phoneNumber });
+      const res = await axios.post("http://localhost:5000/milestone/get_parent_name", { phone: phoneNumber });
       if (res.data?.parent_name) {
         setParentName(res.data.parent_name);
-        // Store in localStorage for persistence across navigation
         localStorage.setItem("parentName", res.data.parent_name);
       }
     } catch (err) {
@@ -104,19 +108,20 @@ function MilestoneAssessment() {
   };
 
   const handleChildSwitch = (selectedId) => {
-    const selected = childList.find(c => c.id === parseInt(selectedId));
+    const selected = childList.find(c => c.id == selectedId);
     if (selected) {
       const updatedChild = { ...selected, phone: childInfo.phone };
       localStorage.setItem("childInfo", JSON.stringify(updatedChild));
       setChildInfo(updatedChild);
-      // Reset assessment state to load new child's assessment
       setMilestones([]);
       setResponses({});
       setPastResponses({});
       setRecommendation(null);
-      setConcern(null); // Reset concern
+      setConcern(null);
       setCurrentIndex(0);
       setIsLoading(true);
+      setShowHistory(false); // Hide history when switching child
+      setCurrentPage(1); // Reset pagination when switching child
     }
   };
 
@@ -125,18 +130,16 @@ function MilestoneAssessment() {
   };
 
   const handleSubmit = () => {
-    const answerList = Object.entries(responses).map(([question, answer]) => ({
-      question,
-      answer,
-    }));
+    const answerList = Object.entries(responses).map(([question, answer]) => ({ question, answer }));
 
-    fetch("http://localhost:5000/chatbot/submit_milestones", {
+    fetch("http://localhost:5000/milestone/submit_milestones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: childInfo.name,
         age: childInfo.age,
         phone: childInfo.phone,
+        childid: childInfo.id,
         answers: answerList,
       }),
     })
@@ -144,13 +147,46 @@ function MilestoneAssessment() {
       .then((data) => {
         if (data.recommendation) {
           setRecommendation(data.recommendation);
-          setConcern(data.concern); // Set concern separately
+          setConcern(data.concern);
+          // After submission, re-fetch past responses to include the new one
+          fetch("http://localhost:5000/milestone/get_milestone_responses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: childInfo.name,
+              phone: childInfo.phone,
+              childid: childInfo.id,
+            }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.milestone_responses) setPastResponses(data.milestone_responses);
+            })
+            .catch((err) => console.error("Error fetching milestone responses after submit:", err));
         }
       })
       .catch((err) => console.error("Error submitting milestones:", err));
   };
 
-  const CurveHeader = ({ childInfo, parentName }) => (
+  const renderNavbar = () => (
+    <div className="navbar">
+      <ul>
+        <li onClick={() => navigate("/")} className="nav-item"><IoMdHome size={35} />Home</li>
+        <li onClick={() => navigate("/child-info")} className="nav-item"><PiBabyBold size={35} />Child Info</li>
+        <li onClick={() => navigate("/chatbot")} className="nav-item"><IoChatbubbleEllipsesSharp size={35} />Chat</li>
+        {/* History button */}
+        <li onClick={() => setShowHistory(true)} className="nav-item">
+          <span style={{ fontSize: "1.5em", marginRight: "5px" }}>&#x1F551;</span>History
+        </li>
+        <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="nav-item"><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
+        <li onClick={() => navigate("/signin", { state: { lang: "en" } })} className="nav-item" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <LogOut size={35} />Sign Out
+        </li>
+      </ul>
+    </div>
+  );
+
+  const CurveHeader = () => (
     <div className="curve-separator10">
       <svg viewBox="0 0 500 80" preserveAspectRatio="none">
         <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back10" />
@@ -170,29 +206,13 @@ function MilestoneAssessment() {
           {parentName && (
             <div className="parent-header-info">
               Sign in as <strong>{parentName}</strong>
-              <div><span>Karnataka,India</span></div>
+              <div>
+                <span>{region ? `${region}, ${country}` : 'Detecting location...'}</span>
+              </div>
             </div>
           )}
         </div>
       </div>
-    </div>
-  );
-
-  const renderNavbar = () => (
-    <div className="navbar">
-      <ul>
-        <li onClick={() => navigate("/")} className="nav-item"><IoMdHome size={35}/>Home</li>
-        <li onClick={() => navigate("/child-info")} className="nav-item"><PiBabyBold size={35} />Child Info</li>
-        <li onClick={() => navigate("/chatbot")} className="nav-item"><IoChatbubbleEllipsesSharp  size={35}/>Chat</li>
-        <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}className="nav-item"><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
-        <li
-          onClick={() => navigate("/signin", { state: { lang: "en" } })}
-          className="nav-item"
-          style={{ display: "flex", alignItems: "center", gap: "15px" }}
-        >
-          <LogOut size={35} />Sign Out
-        </li>
-      </ul>
     </div>
   );
 
@@ -201,7 +221,7 @@ function MilestoneAssessment() {
       <div className="overall-container">
         {renderNavbar()}
         <div className="main-content">
-          <CurveHeader childInfo={childInfo} parentName={parentName} />
+          <CurveHeader />
           <div className="loading-container">
             <div className="loading-spinner"></div>
             <p>Loading milestone assessment...</p>
@@ -216,23 +236,19 @@ function MilestoneAssessment() {
       <div className="overall-container">
         {renderNavbar()}
         <div className="main-content">
-          <CurveHeader childInfo={childInfo} parentName={parentName} />
+          <CurveHeader />
           <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
               <span><strong>Child Name:</strong> {childInfo.name}</span>
-              <span><strong>Age in Months:</strong> {childInfo.age}</span>
+              <span><strong>Age:</strong> {childInfo.age}</span>
             </div>
           </div>
           <div className="recommendation-container">
             <h3>Personalized Development Recommendations</h3>
             <div className="recommendation-content">
-              {/* Render recommendation and concern separately */}
               <p>{recommendation}</p>
               {concern && (
-                <p>
-                  <br /> {/* This creates a new line */}
-                  <strong>Concern based on all the previously answered milestone question:</strong> {concern}
-                </p>
+                <p><br /><strong>Concern:</strong> {concern}</p>
               )}
             </div>
             <div className="action-buttons2">
@@ -240,7 +256,7 @@ function MilestoneAssessment() {
                 className="back-button"
                 onClick={() => {
                   setRecommendation(null);
-                  setConcern(null); // Reset concern
+                  setConcern(null);
                   setCurrentIndex(0);
                   setResponses({});
                 }}
@@ -255,6 +271,120 @@ function MilestoneAssessment() {
     );
   }
 
+  if (showHistory) {
+    const groupedSessions = [];
+    const flatList = [];
+
+    // Flatten and sort the past responses by timestamp
+    for (let [question, entries] of Object.entries(pastResponses)) {
+      entries.forEach(({ answer, timestamp }) => {
+        flatList.push({ question, answer, timestamp });
+      });
+    }
+
+    // Sort by timestamp in descending order (most recent first)
+    flatList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Group into sessions of 5 questions each
+    for (let i = 0; i < flatList.length; i += 5) { // Assuming each "session" is 5 questions as per your original grouping
+      groupedSessions.push(flatList.slice(i, i + 5));
+    }
+
+    // Pagination logic
+    const indexOfLastSession = currentPage * sessionsPerPage;
+    const indexOfFirstSession = indexOfLastSession - sessionsPerPage;
+    const currentSessions = groupedSessions.slice(indexOfFirstSession, indexOfLastSession);
+
+    const totalPages = Math.ceil(groupedSessions.length / sessionsPerPage);
+
+    const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+    return (
+      <div className="overall-container">
+        {renderNavbar()}
+        <div className="main-content">
+          <CurveHeader />
+          <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
+              <span><strong>Child Name:</strong> {childInfo.name}</span>
+              <span><strong>Age:</strong> {childInfo.age}</span>
+            </div>
+            {childList.length > 0 && (
+              <select
+                value={childInfo?.id || ''}
+                onChange={(e) => handleChildSwitch(e.target.value)}
+                style={{ padding: '6px', borderRadius: '6px', fontSize: '14px' }}
+              >
+                {childList.map(child => (
+                  <option key={child.id} value={child.id}>
+                    {child.name} ({child.age}m)
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <h2 style={{ marginTop: "20px" }}></h2>
+          {groupedSessions.length === 0 ? (
+            <p>No past milestone responses available for this child.</p>
+          ) : (
+            <>
+              <div className="accordion-container">
+                {currentSessions.map((session, idx) => (
+                  // Use a unique key based on the session and its timestamp
+                  <details key={`${idx}-${session[0]?.timestamp}`} className="accordion-item">
+                    <summary>
+                      Session #{groupedSessions.length - (indexOfFirstSession + idx)} –{" "} {/* Adjust session numbering for pagination */}
+                      {session[0]?.timestamp ? new Date(session[0].timestamp).toISOString().split('T')[0] : "N/A"}
+                    </summary>
+                    <ul>
+                      {session.map((item, i) => (
+                        <li key={i} style={{ marginBottom: "10px" }}>
+                          <strong>Q:</strong> {item.question}<br />
+                          <strong>A:</strong> {item.answer}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ))}
+              </div>
+              {/* Pagination Controls */}
+              <div className="pagination-controls">
+                <button
+                  onClick={() => paginate(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="pagination-button"
+                >
+                  Previous
+                </button>
+                {[...Array(totalPages)].map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => paginate(i + 1)}
+                    className={`pagination-button ${currentPage === i + 1 ? 'active' : ''}`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                <button
+                  onClick={() => paginate(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="pagination-button"
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          )}
+          <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
+            <button className="back-button" onClick={() => setShowHistory(false)}>
+              <ArrowLeft size={20} /> Answer New Questions
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const currentQuestion = milestones[currentIndex];
   const progress = milestones.length > 0 ? ((currentIndex + 1) / milestones.length) * 100 : 0;
 
@@ -262,12 +392,12 @@ function MilestoneAssessment() {
     <div className="overall-container">
       {renderNavbar()}
       <div className="main-content">
-        <CurveHeader childInfo={childInfo} parentName={parentName} />
+        <CurveHeader />
         {childInfo && (
           <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
               <span><strong>Child Name:</strong> {childInfo.name}</span>
-              <span><strong>Age in Months:</strong> {childInfo.age}</span>
+              <span><strong>Age:</strong> {childInfo.age}</span>
             </div>
             {childList.length > 0 && (
               <select
@@ -312,10 +442,10 @@ function MilestoneAssessment() {
                     onClick={() => handleSelect(currentQuestion, option)}
                   >
                     {option === "Yes"
-                      ? "Yes, my child can do this"
+                      ? "Yes"
                       : option === "No"
-                      ? "Not yet"
-                      : "I'm not sure"}
+                        ? "No"
+                        : "Don't know"}
                   </button>
                 ))}
               </div>

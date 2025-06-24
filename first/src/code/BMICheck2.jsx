@@ -27,14 +27,22 @@ const AssessmentDialog = ({
     error, setAssessmentResult, onClose
 }) => (
     <div className="dialog-overlay">
+        
         <div className="dialog-content">
+            <div className="dialog-header">
+    <img src="/baby-icon.png" alt="Baby Icon" className="dialog-baby-icon" />
+    <h3 className="dialog-title">Shishu Vriddhi</h3>
+</div>
+
             <button className="dialog-close-btn" onClick={onClose}>&times;</button>
             <h2>CGM Assessment</h2>
             {childInfo ? (
-                <><div className="child-info-display"> {/* Child info will be on the left */}
-                            <span><strong>Child Name:</strong> {childInfo?.name || "No child selected"}</span>
-                            <span><strong>Age in Months:</strong> {childInfo ? childInfo.age : "N/A"}</span>
-                        </div>
+                <>   
+                    <div className="child-info-display">
+                        <span><strong>Child Name:</strong> {childInfo?.name || "No child selected"}</span>
+                        {/* Display the formatted age for the user */}
+                        <span><strong>Age:</strong> {formatAge(childInfo.age)}</span>
+                    </div>
                     {!assessmentResult ? (
                         <>
                             <div className="input-group">
@@ -58,6 +66,16 @@ const AssessmentDialog = ({
                     ) : (
                         <div className="result-box">
                             <h3>Assessment Results</h3>
+                            <div className="status-results">
+                                <div className="status-item">
+                                    <span className="status-label">Child Height:</span>
+                                    <span className="status-value">{height} cm</span>
+                                </div>
+                                <div className="status-item">
+                                    <span className="status-label">Child Weight:</span>
+                                    <span className="status-value">{weight} kg</span>
+                                </div>
+                            </div>
                             <div className="status-results">
                                 <div className="status-item">
                                     <span className="status-label">Height Status:</span>
@@ -114,15 +132,31 @@ function BMICheck() {
     const [currentPage, setCurrentPage] = useState(1);
     const [assessmentsPerPage] = useState(8); // Number of assessments per page
 
+    // Helper to parse age string (e.g., "0 years, 0 months, 3 days") into total months
+    // Helper to parse age string (e.g., "2 m, 15 d") and extract *only* the month component.
+const parseAgeStringToMonths = (ageString) => {
+    if (!ageString) {
+        return 0; // Return 0 if the age string is empty or null
+    }
+
+    // Use a regular expression to find the number followed by 'm' (for months)
+    // This is more robust than splitting by comma if the format slightly changes
+    const match = ageString.match(/(\d+)\s*m/);
+
+    if (match && match[1]) {
+        // If a match is found, parse the captured number as an integer
+        return parseInt(match[1], 10);
+    }
+
+    return 0; // Return 0 if no month value is found in the string
+};
+
     useEffect(() => {
         const info = location.state?.childInfo || JSON.parse(localStorage.getItem("childInfo"));
         if (info) {
-            if (!info.phone) {
-                setError("Child information is incomplete. Phone number is missing. Please update child information.");
-                setTimeout(() => navigate("/child-info"), 2000);
-                return;
-            }
-            setChildInfo(info);
+            // Parse the age string into total months here for backend compatibility
+            const ageInMonths = parseAgeStringToMonths(info.age);
+            setChildInfo({ ...info, age: ageInMonths });
         } else {
             setError("Child information not found. Please select a child first.");
             setTimeout(() => navigate("/child-info"), 2000);
@@ -136,14 +170,13 @@ function BMICheck() {
 
     useEffect(() => {
         const fetchPastAssessments = async () => {
-            if (childInfo && childInfo.phone && childInfo.name) {
+            if (childInfo && childInfo.id && childInfo.name) {
                 setPastAssessmentsLoading(true);
                 setPastAssessmentsError('');
                 try {
                     const response = await axios.get("http://localhost:5000/chatbot/child_assessments", {
                         params: {
-                            phone: childInfo.phone,
-                            name: childInfo.name
+                            id: childInfo.id,
                         }
                     });
                     setPastAssessments(response.data);
@@ -156,12 +189,15 @@ function BMICheck() {
             }
         };
 
-        fetchPastAssessments();
-    }, [childInfo]);
+        // Only fetch if childInfo.id is available
+        if (childInfo?.id) {
+            fetchPastAssessments();
+        }
+    }, [childInfo]); // Depend on childInfo to refetch when it changes (e.g., ID is set)
 
     const openAssessmentDialog = () => {
-        if (!childInfo || !childInfo.phone) {
-            setError("Cannot open assessment. Child's phone number is missing. Please update child information.");
+        if (!childInfo || !childInfo.id) {
+            setError("Cannot open assessment. Child information is incomplete. Please select a child with a valid ID.");
             return;
         }
         setShowDialog(true);
@@ -180,12 +216,13 @@ function BMICheck() {
         setError('');
         setIdealRanges(null);
         // Refresh past assessments after closing the dialog if a new assessment was added
-        if (assessmentResult) { // Only refresh if an assessment was successfully made
+        if (assessmentResult) {
             const info = { ...childInfo };
             setChildInfo(info); // This will trigger the useEffect to refetch assessments
         }
     };
 
+    // This function is for display purposes, converting numeric months back to readable format
     const formatAge = (totalMonths) => {
         if (totalMonths == null) return "N/A";
         const years = Math.floor(totalMonths / 12);
@@ -193,17 +230,12 @@ function BMICheck() {
         let result = [];
         if (years) result.push(`${years} year${years > 1 ? 's' : ''}`);
         if (months) result.push(`${months} month${months > 1 ? 's' : ''}`);
-        return result.join(', ') || "Less than 1 month";
+        return result.join(', ') || "Less than 1 month"; // Handles 0 months correctly
     };
 
     const handleAssessment = async () => {
-        if (!childInfo || !height || !weight) {
-            setError("Please fill all fields.");
-            return;
-        }
-
-        if (!childInfo.phone) {
-            setError("Phone number is missing for this child. Please update child information.");
+        if (!childInfo || !childInfo.id || height === '' || weight === '') {
+            setError("Please fill all fields and ensure child information is complete.");
             return;
         }
 
@@ -214,8 +246,9 @@ function BMICheck() {
 
         try {
             const res = await axios.post("http://localhost:5000/chatbot/child_assessment", {
+                id: childInfo.id, // Ensure child ID is sent
                 name: childInfo.name,
-                age: childInfo.age,
+                age: childInfo.age, // This will now be the numeric total months
                 gender: childInfo.gender,
                 phone: childInfo.phone,
                 height: parseFloat(height),
@@ -270,29 +303,29 @@ function BMICheck() {
             <div className="bmi-content-area">
                 <div className="navbar15">
                     <ul>
-                        <li onClick={() => navigate("/")} className="nav-item15"><IoMdHome size={35}/>Home</li>
-                        <li onClick={() => navigate("/child-info")} className="nav-item15"><PiBabyBold size={35}/>Child Info</li>
-                        <li onClick={() => navigate("/chatbot")} className="nav-item15"><IoChatbubbleEllipsesSharp size={35}/>Chat</li>
-                        <li onClick={() => navigate("/milestone")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}className="nav-item15"><span style={{ fontSize: "1.5em" }}>📊</span>Milestone</li>
+                        <li onClick={() => navigate("/")} className="nav-item15"><IoMdHome size={35} />Home</li>
+                        <li onClick={() => navigate("/child-info")} className="nav-item15"><PiBabyBold size={35} />Child Info</li>
+                        <li onClick={() => navigate("/chatbot")} className="nav-item15"><IoChatbubbleEllipsesSharp size={35} />Chat</li>
+                        <li onClick={() => navigate("/milestone")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="nav-item15"><span style={{ fontSize: "1.5em" }}>📊</span>Milestone</li>
                         <li onClick={() => navigate("/signin", { state: { lang: "en" } })} className="nav-item15"
                             style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-                            <LogOut size={35}/>Sign Out
+                            <LogOut size={35} />Sign Out
                         </li>
                     </ul>
                 </div>
 
                 <div className="main-content-display">
-                    {/* Move the child info and assessment button into a header-like section within main-content-display */}
-                    <div className="child-assessment-header"> {/* New div for horizontal layout */}
-                        <div className="child-info-display"> {/* Child info will be on the left */}
+                    <div className="child-assessment-header">
+                        <div className="child-info-display">
                             <span><strong>Child Name:</strong> {childInfo?.name || "No child selected"}</span>
-                            <span><strong>Age in Months:</strong> {childInfo ? childInfo.age : "N/A"}</span>
+                            {/* Display the formatted age here as well */}
+                            <span><strong>Age:</strong> {childInfo ? formatAge(childInfo.age) : "N/A"}</span>
                         </div>
-                        <button className="add-assessment-btn" onClick={openAssessmentDialog} disabled={!childInfo || !childInfo.phone}>
+                        <button className="add-assessment-btn" onClick={openAssessmentDialog} disabled={!childInfo || !childInfo.id}>
                             Add CGM
                         </button>
                     </div>
-                    
+
                     {error && <div style={{ color: 'red', marginTop: '10px', fontWeight: 'bold' }}>{error}</div>}
 
                     <div className="previous-assessments">
@@ -308,18 +341,14 @@ function BMICheck() {
                                             <th>Date</th>
                                             <th>Height (cm)</th>
                                             <th>Weight (kg)</th>
-                                        
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {currentAssessments.map((assessment, index) => (
                                             <tr key={index}>
-                                                <td>{new Date(assessment.assessment_date).toLocaleDateString('en-IN', {year: 'numeric',month: 'short',day: 'numeric',timeZone: 'UTC'  // or use your desired timezone like 'Asia/Kolkata'
-})}</td>
-
+                                                <td>{new Date(assessment.assessment_date).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })}</td>
                                                 <td>{assessment.height_cm}</td>
                                                 <td>{assessment.weight_kg}</td>
-
                                             </tr>
                                         ))}
                                     </tbody>
@@ -331,7 +360,7 @@ function BMICheck() {
                                 </div>
                             </>
                         ) : (
-                            <p>No past assessments available for {childInfo?.name || "this child"}.</p>
+                            <div className="no_past"> <p>No past assessments available for {childInfo?.name || "this child"}.</p></div>
                         )}
                     </div>
                 </div>

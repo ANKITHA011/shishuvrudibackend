@@ -263,7 +263,7 @@
     padding: 40px;
     border-radius: 10px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    max-width: 670px;
+    max-width: 700px;
     width: 90%;
     position: relative;
     animation: fadeInScale 0.3s ease-out;
@@ -325,9 +325,10 @@
     border-radius: 8px;
     cursor: pointer;
     font-size: 1.1rem;
-    width: 100%;
+    width: 40%;
     margin-top: 20px;
     transition: background-color 0.3s ease;
+    justify-content: center;
 }
 
 .dialog-content .submit-btn:hover {
@@ -464,13 +465,85 @@
 /* Instead, we style .child-assessment-header and .child-info-display */
 
 /* Ensure text in dialog inputs is centered */
-.dialog-content .input-group input {
-    width: calc(100% - 20px); /* Adjust width to fill container better, accounting for padding */
-    max-width: 300px; /* Limit input width for better aesthetics */
-    margin: 0 auto; /* Center the input within its group */
-    display: block; /* Make it a block element to apply margin:auto */
+.dialog-content .input-group {
+    display: flex;
+    align-items: center;
+     /* space between label and input */
+    justify-items:space-between;
+    
+    gap: 40px;
 }
 
 .dialog-content .input-group label {
-    text-align: center; /* Center the label for consistency */
+    margin: 0;
+    width: 140px; /* consistent label width */
+    text-align: right; /* align label text right */
+    font-weight: bold;
+    color: #444;
+}
+
+.dialog-content .input-group input {
+    flex: 1;
+    padding: 10px;
+    max-width: 250px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+}
+.input-group label{
+    margin-top: 50px;
+}
+.no_past
+{
+    font-size: larger;
+    font-weight: bold;
+
+    color: black;
+}
+.child-info-display {
+    display: flex;
+    align-items: center;
+    gap: 50px; /* Space between child name and age */
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 25px; /* Add this line for space below child info */
+}
+.dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    border-bottom:  solid #ddd;
+    padding-bottom: 10px;
+    background-color: var(--primary-color); 
+}
+
+.dialog-baby-icon {
+    width: 40px;
+    height: auto;
+}
+
+.dialog-title {
+    font-size: 1.4rem;
+    color: var(--white);
+    font-weight: bold;
+    margin: 0;
+}
+/* Add these styles to your CSS file */
+
+/* Align the "Get Assessment" button to the right */
+.dialog-content > button.submit-btn {
+    margin-left: auto;
+    display: block;
+    width: auto; /* Remove fixed width */
+    padding: 12px 25px; /* Adjust padding as needed */
+}
+
+/* Align the "New Assessment" button in the result box to the right */
+.dialog-content .result-box > button.submit-btn {
+    margin-left: auto;
+    display: block;
+    width: auto; /* Remove fixed width */
+    padding: 12px 25px; /* Adjust padding as needed */
+    margin-top: 20px; /* Keep some top margin */
 }

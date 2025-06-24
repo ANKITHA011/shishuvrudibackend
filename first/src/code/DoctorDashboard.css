@@ -1,0 +1,255 @@
+/* === Container Styling === */
+.doctor-dashboard-container {
+  padding: 20px;
+  margin: 100px 50px 0 300px; /* top right bottom left */
+  width: 70%;
+  box-sizing: border-box;
+}
+
+.dashboard-header {
+  color: #333;
+  font-size: 2em;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #007bff;
+}
+
+/* === Table Structure === */
+.notification-table-wrapper {
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.notification-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background-color: #fff;
+}
+
+.notification-table thead {
+  background-color: #f2f2f2;
+  font-weight: bold;
+  color: #555;
+  text-transform: uppercase;
+  font-size: 0.9em;
+}
+
+.notification-table th,
+.notification-table td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.notification-table tr:hover {
+  background-color: #f9f9f9;
+}
+
+/* === Scrollable Body === */
+.notification-table-body {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* === Buttons === */
+.reply-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.reply-button:hover {
+  background-color: #0056b3;
+}
+
+/* === Empty State === */
+.no-notifications {
+  text-align: center;
+  padding: 30px;
+  font-size: 1.2em;
+  color: #777;
+  background-color: #f0f0f0;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+/* === Modal Styling === */
+.reply-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.reply-modal-content {
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  animation: fadeInScale 0.3s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.reply-modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5em;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.reply-modal-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #555;
+}
+
+.reply-modal-content textarea {
+  width: 100%;
+  height: 120px;
+  padding: 10px;
+  margin-bottom: 20px;
+  font-size: 1em;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  resize: vertical;
+}
+
+.reply-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.reply-modal-actions button {
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+  border: none;
+}
+
+.send-reply-btn {
+  background-color: #28a745;
+  color: white;
+}
+
+.send-reply-btn:hover {
+  background-color: #218838;
+}
+
+.cancel-reply-btn {
+  background-color: #dc3545;
+  color: white;
+}
+
+.cancel-reply-btn:hover {
+  background-color: #c82333;
+}
+.view-button {
+  margin-left: 10px;
+  color: black;
+  padding: 6px 12px;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+/* --- Modal Styling --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  padding: 25px 35px; /* Slightly increased padding for better spacing */
+  border-radius: 8px;
+  width: 450px; /* Slightly increased width for better readability */
+  max-width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); /* Enhanced shadow for depth */
+  display: flex; /* Enable Flexbox for vertical alignment */
+  flex-direction: column; /* Stack items vertically */
+  gap: 12px; /* Space between content elements */
+  box-sizing: border-box; /* Include padding in the width calculation */
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 15px; /* Adjusted margin */
+  text-align: center; /* Center the heading */
+  color: #333;
+  font-size: 1.6em;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-content p {
+  display: flex; /* Use flexbox for each paragraph to align label and value */
+   /* Pushes label to left, value to right */
+  align-items: baseline; /* Aligns text along the baseline */
+  margin: 0; /* Remove default paragraph margins */
+  font-size: 1.05em; /* Slightly larger text for readability */
+}
+
+.modal-content p strong {
+  flex-shrink: 0; /* Prevent label from shrinking */
+  margin-right: 15px; /* Space between label and value */
+  color: #555;
+  min-width: 120px; /* Give a minimum width to labels for better alignment */
+  text-align: left; /* Ensure labels are left-aligned */
+}
+
+.close-button {
+  margin-top: 25px; /* Increased margin from content */
+  background-color: #007bff; /* Changed to primary color for consistency */
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 1em;
+  align-self: center; /* Center the button in the flex container */
+  transition: background-color 0.2s ease-in-out;
+}
+
+.close-button:hover {
+  background-color: #0056b3;
+}

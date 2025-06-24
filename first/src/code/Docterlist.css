@@ -1,0 +1,133 @@
+.doctor-dialog {
+  padding: 20px;
+  border: none;
+  border-radius: 10px;
+  width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.doctor-card {
+  background: #f1f1f1;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 8px;
+}
+
+.chat-button {
+  background-color: var(--background-light);
+  color: black;
+  border: none;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.close-dialog-button {
+  margin-top: 20px;
+  background-color: crimson;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.doctor-dialog {
+  padding: 20px;
+  border: none;
+  border-radius: 10px;
+  width: 700px;
+  /* Calculate max-height based on available viewport height,
+     subtracting the estimated height of header + child info bar + some buffer */
+  max-height: calc(100vh - 180px); /* Adjust 180px (150px for header/child info + 30px buffer) as needed */
+  overflow-y: auto;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+
+  /* New positioning for modal behavior */
+  position: fixed; /* Ensures it's positioned relative to the viewport */
+  top: 160px; /* Adjust this value to be just below your header + child info bar.
+                 This is a hardcoded value and might not be perfect if header/child info height changes. */
+  left: 50%; /* Center horizontally */
+  transform: translateX(-50%); /* Adjust for accurate horizontal centering */
+  margin: 0; /* Override any default margin a dialog might have */
+  z-index: 1000; /* Ensure it's above other content if showModal() doesn't handle it */
+  background-color: white; /* Explicitly set background color for the dialog */
+}
+.doctor-dialog::backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+.doctor-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.doctor-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px; /* Optional: prevents scrollbar from overlapping content */
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+}
+
+.close-dialog-button {
+  background: none;
+  color: #555;
+  font-size: 30px;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+}
+.doctor-card {
+  background: #f1f1f1;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 8px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.doctor-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-button {
+  background-color: var(--background-light);
+  color: black;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.close-dialog-button {
+  background: none;
+  color: #555;
+  font-size: 30px;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+}
+
+.doctor-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.doctor-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+}
