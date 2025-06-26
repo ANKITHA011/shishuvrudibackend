@@ -45,8 +45,10 @@ function Withoutsignin() {
     const [hasStartedChat, setHasStartedChat] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const utteranceRef = useRef(null);
-
-    const [state, setState] = useState({
+    const [isRecording, setIsRecording] = useState(false);
+        const mediaRecorder = useRef(null);
+        const audioChunks = useRef([]);
+        const [state, setState] = useState({
         signedIn: null,
         age: '',
         mode: '',
@@ -125,7 +127,71 @@ function Withoutsignin() {
 
         synth.speak(utter);
     };
-
+        // NEW: Function to start recording audio
+    const startRecording = async () => {
+        if (isSpeaking) { // Stop any ongoing speech before recording
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder.current = new MediaRecorder(stream);
+            audioChunks.current = [];
+            mediaRecorder.current.ondataavailable = (event) => {
+                audioChunks.current.push(event.data);
+            };
+            mediaRecorder.current.onstop = async () => {
+                const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' }); // Use webm for broader compatibility
+                console.log("Audio recorded:", audioBlob);
+                // Send to backend for Whisper transcription
+                setLoading(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'recording.webm'); // Ensure correct filename and type
+                    const response = await axios.post("http://localhost:5000/chatbot/speech-to-text", formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    });
+                    const transcribedText = response.data.text;
+                    if (transcribedText) {
+                        setInput(transcribedText); // Set the transcribed text into the input field
+                        // Optionally, auto-send the message if you want
+                        // handleSend(transcribedText);
+                    } else {
+                        addBotMessage("Could not transcribe audio. Please try again.", []);
+                    }
+                } catch (error) {
+                    console.error("Error sending audio to Whisper backend:", error);
+                    addBotMessage("Error processing speech. Please try typing your message.", []);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            mediaRecorder.current.start();
+            setIsRecording(true);
+            console.log("Recording started...");
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+            addBotMessage("Microphone access denied or an error occurred. Please ensure microphone permissions are granted.", []);
+        }
+    };
+    // NEW: Function to stop recording audio
+    const stopRecording = () => {
+        if (mediaRecorder.current && isRecording) {
+            mediaRecorder.current.stop();
+            setIsRecording(false);
+            console.log("Recording stopped.");
+        }
+    };
+    const handleMicButtonClick = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    };
+    
     const handleSpeechToText = () => {
         console.log("Speech-to-text button clicked");
     };
@@ -311,9 +377,9 @@ function Withoutsignin() {
         setLoading(false);
     };
 
-    const handleSend = () => {
-        if (!input.trim()) return;
-        handleUserReply(input.trim());
+    const handleSend = (messageToSend = input) => {
+        if (!messageToSend.trim()) return;
+        handleUserReply(messageToSend.trim());
         setInput('');
     };
 
@@ -436,17 +502,21 @@ function Withoutsignin() {
         }
     }}
     placeholder="Ask a question about your child..."
-    disabled={loading}
+    disabled={loading|| isRecording}
 />
 
                             {!input.trim() ? (
-                                <button onClick={handleSpeechToText} title="Speak" className="mic-button" disabled={loading}>
-                                    <Mic />
-                                </button>
+                               <button
+                                                           onClick={handleMicButtonClick}
+                                                           title={isRecording ? "Stop Recording" : "Start Recording"}
+                                                           className="mic-button"
+                                                           disabled={loading}
+                                                           style={{ backgroundColor: isRecording ? 'red' : 'transparent' }} // Visual feedback for recording
+                                                       >
+                                                           <Mic color={isRecording ? 'white' : 'black'} />
+                                                       </button>
                             ) : (
-                                <button onClick={handleSend} disabled={loading || !input.trim()}>
-                                    Send
-                                </button>
+                                <button onClick={handleSend} disabled={loading || !input.trim()}>Send</button>
                             )}
                         </div>
                     )}

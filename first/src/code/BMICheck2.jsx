@@ -324,6 +324,7 @@ const parseAgeStringToMonths = (ageString) => {
                         <button className="add-assessment-btn" onClick={openAssessmentDialog} disabled={!childInfo || !childInfo.id}>
                             Add CGM
                         </button>
+
                     </div>
 
                     {error && <div style={{ color: 'red', marginTop: '10px', fontWeight: 'bold' }}>{error}</div>}
