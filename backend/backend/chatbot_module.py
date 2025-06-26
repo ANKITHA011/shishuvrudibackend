@@ -782,8 +782,17 @@ def get_chat_notifications(doctor_id):
                 WHERE chatnotidoctorid = %s
                 ORDER BY createddate DESC
             """, (doctor_id,))
-            notifications = cursor.fetchall()
+            raw_notifications = cursor.fetchall()
+
+        # Explicitly convert datetime to ISO 8601 string
+        notifications = []
+        for notif in raw_notifications:
+            if isinstance(notif["timestamp"], datetime):
+                notif["timestamp"] = notif["timestamp"].isoformat()
+            notifications.append(notif)
+
         return jsonify(notifications)
+
     except Exception as e:
         print(f"❌ Error fetching chat notifications for doctor {doctor_id}: {e}")
         traceback.print_exc()
@@ -791,6 +800,7 @@ def get_chat_notifications(doctor_id):
     finally:
         if conn:
             conn.close()
+
 
 
 @chatbot_bp.route('/chatbot/mark_seen', methods=['POST'])
@@ -882,12 +892,19 @@ def get_child_info(child_id):
     finally:
         if conn:
             conn.close()
-@chatbot_bp.route('/notification/action_taken', methods=['POST'])
+from datetime import datetime, timedelta
+
+@chatbot_bp.route('/notification/action_taken', methods=['POST']) 
 def update_action_taken():
     data = request.get_json()
     child_id = data.get("child_id")
     doctor_id = data.get("doctor_id")
-    final_waiting_time = data.get("final_waiting_time")  # ✅ Get from request
+    final_waiting_time = data.get("final_waiting_time")
+
+    # Get current IST time
+    utc_now = datetime.utcnow()
+    ist_offset = timedelta(hours=5, minutes=30)
+    ist_now = utc_now + ist_offset
 
     conn = None
     try:
@@ -896,9 +913,10 @@ def update_action_taken():
             cursor.execute("""
                 UPDATE tblchatnotification
                 SET chatnotiactionatkenbydoctor = 'yes',
-                    final_waiting_time = %s  -- ✅ Save final waiting time
+                    final_waiting_time = %s,
+                    action_time = %s
                 WHERE chatnotichildid = %s AND chatnotidoctorid = %s
-            """, (final_waiting_time, child_id, doctor_id))
+            """, (final_waiting_time, ist_now, child_id, doctor_id))
             conn.commit()
         return jsonify({"success": True})
     except Exception as e:
@@ -907,6 +925,7 @@ def update_action_taken():
     finally:
         if conn:
             conn.close()
+
 
 @chatbot_bp.route('/notification/mark_seen', methods=['POST'])
 def update_seen():
@@ -928,6 +947,91 @@ def update_seen():
     except Exception as e:
         print(f"❌ Error updating seen status: {e}")
         return jsonify({"success": False}), 500
+    finally:
+        if conn:
+            conn.close()
+@chatbot_bp.route('/notification/action_status/<doctor_id>', methods=['GET'])
+def get_action_status(doctor_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT 
+                    chatnotiid,
+                    chatnotichildid,
+                    chatnotiactionatkenbydoctor,
+                    action_time
+                FROM tblchatnotification
+                WHERE chatnotidoctorid = %s
+            """, (doctor_id,))
+            rows = cursor.fetchall()
+
+        return jsonify(rows), 200
+    except Exception as e:
+        print(f"❌ Error fetching action status: {e}")
+        return jsonify({"error": "Internal Server Error"}), 500
+    finally:
+        if conn:
+            conn.close()
+@chatbot_bp.route('/update_last_action/<doctor_id>', methods=['POST'])
+def update_last_action(doctor_id):
+    data = request.get_json()
+    available = data.get("available", True)  # Default to True if not passed
+
+    utc_now = datetime.utcnow()
+    ist_now = utc_now + timedelta(hours=5, minutes=30)
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO login_sessions (doctor_id, last_action_time, available)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE 
+                    last_action_time = VALUES(last_action_time),
+                    available = VALUES(available)
+            """, (doctor_id, ist_now, available))
+
+            conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"❌ Error updating last action: {e}")
+        return jsonify({"success": False}), 500
+    finally:
+        if conn:
+            conn.close()
+
+
+@chatbot_bp.route('/doctor/availability/<doctor_id>', methods=['GET'])
+def get_doctor_availability(doctor_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT last_action_time
+                FROM login_sessions
+                WHERE doctor_id = %s
+            """, (doctor_id,))
+            row = cursor.fetchone()
+
+        if not row:
+            return jsonify({"available": False}), 200
+
+        last_action = row["last_action_time"]
+        current_time = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        delta = current_time - last_action
+        is_online = delta.total_seconds() < 5  # 5 minutes
+
+        return jsonify({
+            "available": is_online,
+            "last_action_time": last_action.isoformat()
+        }), 200
+    except Exception as e:
+        print(f"❌ Error fetching availability: {e}")
+        return jsonify({"available": False}), 500
     finally:
         if conn:
             conn.close()

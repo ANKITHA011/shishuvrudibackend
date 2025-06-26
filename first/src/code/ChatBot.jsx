@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Volume2, Mic, LogOut } from "lucide-react";
-import './chat.css';
-import { FaArrowCircleDown, FaRegFilePdf, FaFileAlt, FaFileCode, FaHistory } from "react-icons/fa";
-import jsPDF from 'jspdf';
+import { Volume2, Mic, LogOut, ArrowDownCircle, FileText, Code, History, Home, Baby } from "lucide-react";
+// import './chat.css'; // This CSS file needs to be handled externally or styles moved inline/to Tailwind
+
+// For jsPDF, assume it's loaded via CDN in the HTML environment
+// You will need to add <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+// to your HTML file where this React app is mounted.
+const jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
+
 import axios from 'axios';
-import { IoMdHome } from "react-icons/io";
-import { PiBabyBold } from "react-icons/pi";
 
 // Helper function to format timestamp
 const formatTimestamp = (dateString) => {
@@ -29,7 +31,7 @@ const CurveHeader = ({ childInfo, parentName, region, country }) => (
         <div className="curve-content5">
             <div className="curve-left-section">
                 <div className="curve-icon5">
-                    <img src="/baby-icon.png" alt="Baby Icon" />
+                    <img src="/baby-icon.png" alt="Baby Icon" /> {/* Ensure this image path is correct */}
                 </div>
                 <span className="curve-app-title">Shishu Vriddhi</span>
             </div>
@@ -48,10 +50,11 @@ const CurveHeader = ({ childInfo, parentName, region, country }) => (
     </div>
 );
 
+// Map download options to Lucide React icons
 const downloadOptionIcons = {
-    'Download PDF': FaRegFilePdf,
-    'Download TXT': FaFileAlt,
-    'Download JSON': FaFileCode,
+    'Download PDF': FileText, // Using FileText for PDF
+    'Download TXT': FileText, // Using FileText for TXT
+    'Download JSON': Code,    // Using Code for JSON
 };
 
 function ChatBot() {
@@ -68,13 +71,15 @@ function ChatBot() {
     const [childList, setChildList] = useState(JSON.parse(localStorage.getItem("childList")) || []);
     const [userRegion, setUserRegion] = useState("Loading region...");
     const [userCountry, setUserCountry] = useState("Loading country...");
-    const [showDoctorListDialog, setShowDoctorListDialog] = useState(false); // New state for dialog
-    const [doctors, setDoctors] = useState([]); // New state for doctors list
+    const [showDoctorListDialog, setShowDoctorListDialog] = useState(false);
+    const [doctors, setDoctors] = useState([]);
+    const [availabilityMap, setAvailabilityMap] = useState({}); // State for doctor availability
+    const [availabilityIntervalId, setAvailabilityIntervalId] = useState(null); // To store interval ID for polling
 
     const chatWindowRef = useRef(null);
     const inputRef = useRef(null);
     const utteranceRef = useRef(null);
-    const doctorDialogRef = useRef(null); // Ref for the doctor list dialog
+    const doctorDialogRef = useRef(null);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -128,6 +133,34 @@ function ChatBot() {
         }
     }, [showDoctorListDialog]);
 
+    // NEW: Effect to manage polling for doctor availability
+    useEffect(() => {
+        if (showDoctorListDialog && doctors.length > 0) {
+            // Clear any existing interval to prevent duplicates
+            if (availabilityIntervalId) {
+                clearInterval(availabilityIntervalId);
+            }
+
+            // Fetch immediately and then every 5 seconds
+            fetchAvailabilityForDoctors(doctors); // Initial fetch
+            const interval = setInterval(() => {
+                fetchAvailabilityForDoctors(doctors);
+            }, 5000); // Poll every 5 seconds (adjust as needed)
+            setAvailabilityIntervalId(interval);
+
+            // Cleanup function to clear the interval when the dialog is closed or component unmounts
+            return () => {
+                clearInterval(interval);
+                setAvailabilityIntervalId(null);
+            };
+        } else if (!showDoctorListDialog && availabilityIntervalId) {
+            // Clear interval if dialog is closed
+            clearInterval(availabilityIntervalId);
+            setAvailabilityIntervalId(null);
+        }
+    }, [showDoctorListDialog, doctors]); // Add doctors to dependency array so it re-runs if doctors list changes
+
+
     const fetchUserInfo = async () => {
         try {
             const response = await axios.get("http://localhost:5000/api/userinfo");
@@ -137,6 +170,33 @@ function ChatBot() {
             console.error("Error fetching user info:", error);
             setUserRegion("Unknown Region");
             setUserCountry("Unknown Country");
+        }
+    };
+
+    const fetchAvailabilityForDoctors = async (doctorsList) => {
+        try {
+            const availabilityResults = await Promise.all(
+                doctorsList.map(async (doc) => {
+                    const res = await axios.get(`http://localhost:5000/chatbot/doctor/availability/${doc.doctor_id}`);
+                    return { doctor_id: doc.doctor_id, available: res.data.available };
+                })
+            );
+
+            const newAvailabilityMap = {};
+            availabilityResults.forEach(({ doctor_id, available }) => {
+                newAvailabilityMap[doctor_id] = available;
+            });
+
+            // Merge new availability with existing map to maintain previous states for other doctors
+            setAvailabilityMap(prevMap => ({ ...prevMap, ...newAvailabilityMap }));
+        } catch (error) {
+            console.error("Failed to fetch doctors availability", error);
+            // Optionally, set doctors to offline if fetching fails
+            const failedAvailability = {};
+            doctorsList.forEach(doc => {
+                failedAvailability[doc.doctor_id] = false; // Assume offline on error
+            });
+            setAvailabilityMap(prevMap => ({ ...prevMap, ...failedAvailability }));
         }
     };
 
@@ -345,6 +405,12 @@ function ChatBot() {
         console.log("Attempting to download in format:", format);
         const textContent = messages.map(m => `${m.sender}: ${m.text} (${m.timestamp})`).join('\n');
 
+        if (!jsPDF) {
+            addBotMessage("PDF download is not available. Please ensure jsPDF library is loaded correctly.", []);
+            console.error("jsPDF is not loaded.");
+            return;
+        }
+
         if (!textContent && format !== 'pdf') {
             console.warn("No chat messages to download.");
             addBotMessage("There are no messages in the chat to download.", []);
@@ -352,13 +418,18 @@ function ChatBot() {
         }
 
         if (format === 'pdf') {
-            const doc = new jsPDF();
-            doc.setFontSize(12);
-            const lines = doc.splitTextToSize(textContent || "No chat history available.", 180);
-            doc.text(lines, 10, 10);
-            doc.save("chat_history.pdf");
-            console.log("PDF download initiated successfully by jsPDF.");
-            addBotMessage("Your chat history has been downloaded as a PDF.", []);
+            try {
+                const doc = new jsPDF();
+                doc.setFontSize(12);
+                const lines = doc.splitTextToSize(textContent || "No chat history available.", 180);
+                doc.text(lines, 10, 10);
+                doc.save("chat_history.pdf");
+                console.log("PDF download initiated successfully by jsPDF.");
+                addBotMessage("Your chat history has been downloaded as a PDF.", []);
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                addBotMessage("Failed to generate PDF. Please try again later.", []);
+            }
             return;
         }
 
@@ -490,6 +561,7 @@ function ChatBot() {
             const res = await axios.get('http://localhost:5000/chatbot/doctors');
             setDoctors(res.data);
             setShowDoctorListDialog(true);
+            // The useEffect will now handle fetching availability immediately and then periodically
         } catch (err) {
             console.error("Error fetching doctors:", err);
             addBotMessage("Failed to load doctor list. Please try again later.", []);
@@ -520,11 +592,11 @@ function ChatBot() {
 
             <div className="left-nav1">
                 <ul>
-                    <li onClick={() => navigate("/")}><IoMdHome size={35} />Home</li>
-                    <li onClick={() => navigate("/child-info")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><span style={{ fontSize: "1.5em" }}><PiBabyBold size={35} /></span>Child Info</li>
+                    <li onClick={() => navigate("/")}><Home size={35} />Home</li>
+                    <li onClick={() => navigate("/child-info")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><span style={{ fontSize: "1.5em" }}><Baby size={35} /></span>Child Info</li>
                     <li onClick={() => navigate("/milestone")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📊</span>Milestone</li>
                     <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
-                    <li onClick={loadHistory} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><FaHistory size={30} />Chat History</li>
+                    <li onClick={loadHistory} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><History size={30} />Chat History</li>
                     <li onClick={() => navigate("/signin", { state: { lang: 'en' } })} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><LogOut size={30} />Sign Out</li>
                 </ul>
             </div>
@@ -565,7 +637,7 @@ function ChatBot() {
                             }}
                             title="Download Chat"
                         >
-                            <FaArrowCircleDown size={18} />
+                            <ArrowDownCircle size={18} />
                             Download Chat
                         </button>
                         {childInfo && (
@@ -579,7 +651,7 @@ function ChatBot() {
                                         cursor: 'pointer',
                                         fontSize: '12px',
                                     }}
-                                    onClick={handleChatWithPediatricianClick} // This will now open the dialog
+                                    onClick={handleChatWithPediatricianClick}
                                 >
                                     👨‍⚕️ Chat with Pediatrician
                                 </button>
@@ -631,18 +703,18 @@ function ChatBot() {
                 {!chatEnded ? (
                     <div className="input-row">
                         <input
-    ref={inputRef}
-    type="text"
-    value={input}
-    onChange={(e) => setInput(e.target.value)}
-    onKeyDown={(e) => {
-        if (e.key === 'Enter' && !loading && input.trim()) {
-            handleSend();
-        }
-    }}
-    placeholder="Ask a question about your child..."
-    disabled={loading}
-/>
+                            ref={inputRef}
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !loading && input.trim()) {
+                                    handleSend();
+                                }
+                            }}
+                            placeholder="Ask a question about your child..."
+                            disabled={loading}
+                        />
 
                         {!input.trim() ? (
                             <button onClick={() => console.log("Mic clicked")} title="Speak" className="mic-button" disabled={loading}>
@@ -660,35 +732,44 @@ function ChatBot() {
             </div>
 
             <dialog ref={doctorDialogRef} className="doctor-dialog">
-    <div className="doctor-dialog-header">
-        <h2 className="doctor-dialog-title">Available Pediatricians</h2>
+                <div className="doctor-dialog-header">
+                    <h2 className="doctor-dialog-title">Available Pediatricians</h2>
 
-        <button className="close-dialog-button" onClick={() => setShowDoctorListDialog(false)}>✖</button>
-    </div>
-
-    <div className="doctor-list">
-        {doctors.length > 0 ? (
-            doctors.map((doc) => (
-                <div key={doc.doctor_id} className="doctor-card">
-                    <div className="doctor-details">
-                        <p><strong>Name:</strong> {doc.doctor_name}</p>
-                        <p><strong>Email:</strong> {doc.email_id}</p>
-                    </div>
-                    <button
-                        onClick={() => handleStartDoctorChat(doc)}
-                        className="chat-button"
-                    >
-                        Start Chat
-                    </button>
+                    <button className="close-dialog-button" onClick={() => setShowDoctorListDialog(false)}>✖</button>
                 </div>
-            ))
-        ) : (
-            <p>No doctors available at the moment.</p>
-        )}
-    </div>
-</dialog>
 
-
+                <div className="doctor-list">
+                    {doctors.length > 0 ? (
+                        doctors.map((doc) => (
+                            <div key={doc.doctor_id} className="doctor-card">
+                                <div className="doctor-details">
+                                    <p><strong>Name:</strong> {doc.doctor_name}</p>
+                                    <p><strong>Email:</strong> {doc.email_id}</p>
+                                    <p>
+                                        <strong>Status: </strong>
+                                        <span style={{
+                                            color: availabilityMap[doc.doctor_id] ? "green" : "gray",
+                                            fontWeight: "bold",
+                                        }}>
+                                            ● {availabilityMap[doc.doctor_id] ? "Online" : "Offline"}
+                                        </span>
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => handleStartDoctorChat(doc)}
+                                    className="chat-button"
+                                    // Disable button if doctor is offline
+                                    disabled={!availabilityMap[doc.doctor_id]}
+                                >
+                                    Start Chat
+                                </button>
+                            </div>
+                        ))
+                    ) : (
+                        <p>No doctors available at the moment.</p>
+                    )}
+                </div>
+            </dialog>
         </div>
     );
 }
