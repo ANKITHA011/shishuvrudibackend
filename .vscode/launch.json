@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "compounds": [
+    {
+      "name": "Run Full Stack",
+      "configurations": ["Run Flask", "Launch Edge against localhost"]
+    }
+  ],
+  "configurations": [
+    {
+      "name": "Run Flask",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend//backend/app.py",
+      "console": "integratedTerminal",
+      "justMyCode":true
+    },
+    // {
+    // //  "name": "Run React",
+    // //  "type": "pwa-node",
+    //   "request": "launch",
+    //   "name": "Run React",
+    //   "runtimeExecutable": "npm",
+    //   "runtimeArgs": ["run", "dev"],
+    //   "cwd": "${workspaceFolder}/frontend",
+    //   "console": "integratedTerminal"
+    // }
+
+    {
+      "name": "Launch Edge against localhost",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/first",
+  "runtimeExecutable": "stable"
+},
+{
+  "name": "Run React",
+  "type": "node",
+  "request": "launch",
+  "runtimeExecutable": "npm",
+  "runtimeArgs": ["run", "dev"], // change to "start" if you're using CRA
+  "cwd": "${workspaceFolder}/first",
+  "console": "integratedTerminal"
+}
+  ]
+}

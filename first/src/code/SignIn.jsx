@@ -80,6 +80,7 @@ function SignIn() {
       } else {
         localStorage.setItem("userId", userid);
         localStorage.setItem("parentName", name);
+        localStorage.setItem("selectedLang",selectedLang);
         navigate("/child-info");
       }
     } catch (err) {
