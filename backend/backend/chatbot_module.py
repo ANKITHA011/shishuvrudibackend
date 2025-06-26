@@ -720,33 +720,51 @@ def get_notifications(doctor_phone):
         if conn:
             conn.close()
 
+from datetime import datetime, timedelta
+
 @chatbot_bp.route('/create_chat_notification', methods=['POST'])
 def create_chat_notification():
-    data = request.json
     conn = None
     try:
+        data = request.get_json()
         child_id = data['child_id']
         doctor_id = data['doctor_id']
-        created_date = datetime.now()
+
+        # Current UTC time
+        utc_now = datetime.utcnow()
+
+        # IST is UTC + 5 hours 30 minutes
+        ist_offset = timedelta(hours=5, minutes=30)
+        ist_now = utc_now + ist_offset  # convert to IST
 
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO tblchatnotification
-                (chatnotichildid, chatnotidoctorid, chatnotiseenbydoctor, chatnotiactionatkenbydoctor, createddate)
+                (
+                    chatnotichildid,
+                    chatnotidoctorid,
+                    chatnotiseenbydoctor,
+                    chatnotiactionatkenbydoctor,
+                    createddate
+                )
                 VALUES (%s, %s, %s, %s, %s)
-            """, (child_id, doctor_id, "no", "no", created_date))
+            """, (child_id, doctor_id, "no", "no", ist_now))
             conn.commit()
+
         return jsonify({"status": "success", "message": "Notification created"}), 201
+
     except Exception as e:
-        print(f"❌ Failed to create chat notification for child {child_id}, doctor {doctor_id}: {e}")
+        print(f"❌ Failed to create chat notification: {e}")
         traceback.print_exc()
         if conn:
             conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
+
     finally:
         if conn:
             conn.close()
+
 
 @chatbot_bp.route('/chatbot/notifications/<doctor_id>', methods=['GET'])
 def get_chat_notifications(doctor_id):
@@ -869,6 +887,7 @@ def update_action_taken():
     data = request.get_json()
     child_id = data.get("child_id")
     doctor_id = data.get("doctor_id")
+    final_waiting_time = data.get("final_waiting_time")  # ✅ Get from request
 
     conn = None
     try:
@@ -876,9 +895,10 @@ def update_action_taken():
         with conn.cursor() as cursor:
             cursor.execute("""
                 UPDATE tblchatnotification
-                SET chatnotiactionatkenbydoctor = 'yes'
+                SET chatnotiactionatkenbydoctor = 'yes',
+                    final_waiting_time = %s  -- ✅ Save final waiting time
                 WHERE chatnotichildid = %s AND chatnotidoctorid = %s
-            """, (child_id, doctor_id))
+            """, (final_waiting_time, child_id, doctor_id))
             conn.commit()
         return jsonify({"success": True})
     except Exception as e:
@@ -887,6 +907,7 @@ def update_action_taken():
     finally:
         if conn:
             conn.close()
+
 @chatbot_bp.route('/notification/mark_seen', methods=['POST'])
 def update_seen():
     data = request.get_json()

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { IoMdHome } from "react-icons/io";
+import translations from "./translatations23";
 import "./signin.css";
 import "./App.css";
 
@@ -27,23 +28,32 @@ function DoctorSignUp() {
     doctor_name: "",
     password: "",
     rePassword: "",
+    license_id: "",
+    email_id: "",
+    qualification: "",
+    specialization: ""
   });
 
+  const [step, setStep] = useState(1);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [errors, setErrors] = useState({});
   const [success, setSuccess] = useState("");
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const selectedLang = location.state?.lang || "en";
+  const t = translations[selectedLang] || translations["en"];
+
   const phoneRef = useRef(null);
   const otpRef = useRef(null);
   const passwordRef = useRef(null);
 
   useEffect(() => {
-    if (!otpSent) phoneRef.current?.focus();
-    else if (!otpVerified) otpRef.current?.focus();
-    else passwordRef.current?.focus();
-  }, [otpSent, otpVerified]);
+    if (step === 1) phoneRef.current?.focus();
+    if (step === 3 && !otpVerified) otpRef.current?.focus();
+    if (step === 4) passwordRef.current?.focus();
+  }, [step, otpVerified]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -51,21 +61,35 @@ function DoctorSignUp() {
     setSuccess("");
   };
 
-  const validateInitial = () => {
+  const validateStep1 = () => {
     const temp = {};
-    if (!form.phone || !/^\d{10}$/.test(form.phone)) temp.phone = "Enter a valid 10-digit phone number.";
-    if (!form.doctor_name.trim()) temp.doctor_name = "Doctor name is required.";
+    if (!form.phone || !/^\d{10}$/.test(form.phone)) temp.phone = t.errors.invalidPhone;
+    if (!form.doctor_name.trim()) temp.doctor_name = t.errors.nameRequired;
+    if (!form.license_id.trim()) temp.license_id = t.errors.licenseRequired;
+    if (!form.email_id.trim() || !/\S+@\S+\.\S+/.test(form.email_id)) temp.email_id = t.errors.emailInvalid;
+    return temp;
+  };
+
+  const validateStep2 = () => {
+    const temp = {};
+    if (!form.qualification.trim()) temp.qualification = t.errors.qualificationRequired;
+    if (!form.specialization.trim()) temp.specialization = t.errors.specializationRequired;
+    return temp;
+  };
+
+  const validateStep4 = () => {
+    const temp = {};
+    if (!form.password) temp.password = t.errors.passwordRequired;
+    else if (form.password.length < 6) temp.password = t.errors.passwordLength;
+    if (form.password !== form.rePassword) temp.rePassword = t.errors.passwordMismatch;
     return temp;
   };
 
   const handleRequestOTP = async () => {
-    const temp = validateInitial();
-    if (Object.keys(temp).length) return setErrors(temp);
-
     try {
-      const res = await axios.post("http://localhost:5000/login/request_otp", {
+      const res = await axios.post("http://localhost:5000/login/request_otp2", {
         phone: form.phone,
-        language: "en",
+        language: selectedLang,
       });
       setOtpSent(true);
       setSuccess(res.data.message);
@@ -75,42 +99,54 @@ function DoctorSignUp() {
   };
 
   const handleVerifyOTP = async () => {
-    if (!/^\d{4}$/.test(form.otp)) {
-      return setErrors({ otp: "Invalid OTP format." });
-    }
+    if (!/^\d{4}$/.test(form.otp)) return setErrors({ otp: t.errors.otpInvalid });
 
     try {
       const res = await axios.post("http://localhost:5000/login/verify_otp", {
         phone: form.phone,
         otp: form.otp,
-        language: "en",
+        language: selectedLang,
       });
       setOtpVerified(true);
       setSuccess(res.data.message);
+      setStep(4);
     } catch (err) {
       setErrors({ general: err.response?.data?.message || "OTP verification failed." });
     }
   };
 
-  const handleSignUp = async () => {
-    const temp = {};
-    if (!form.password || form.password.length < 6) temp.password = "Password must be at least 6 characters.";
-    if (form.password !== form.rePassword) temp.rePassword = "Passwords do not match.";
-    if (!otpVerified) temp.general = "Please verify OTP first.";
+  const handleNext = () => {
+    let validation = {};
+    if (step === 1) validation = validateStep1();
+    else if (step === 2) validation = validateStep2();
+    else if (step === 4) validation = validateStep4();
 
-    if (Object.keys(temp).length) return setErrors(temp);
+    if (Object.keys(validation).length) {
+      setErrors(validation);
+    } else {
+      if (step === 2) {
+        handleRequestOTP();
+        setStep(3);
+      } else if (step < 4) {
+        setStep((prev) => prev + 1);
+      } else {
+        handleSignUp();
+      }
+    }
+  };
+
+  const handleSignUp = async () => {
+    const validation = validateStep4();
+    if (Object.keys(validation).length) return setErrors(validation);
 
     try {
-      const res = await axios.post("http://localhost:5000/login/create_account", {
-        phone: form.phone,
-        password: form.password,
-        doctor_name: form.doctor_name,
+      const res = await axios.post("http://localhost:5000/login/doctor/signup", {
+        ...form,
         role: "doctor",
-        language: "en",
+        language: selectedLang,
       });
-
       setSuccess(res.data.message);
-      setTimeout(() => navigate("/signin"), 1500);
+      setTimeout(() => navigate("/signin", { state: { lang: selectedLang } }), 1500);
     } catch (err) {
       setErrors({ general: err.response?.data?.message || "Signup failed." });
     }
@@ -120,119 +156,136 @@ function DoctorSignUp() {
     <div className="container1">
       <div className="main-wrapper-two1">
         <div className="left-section1">
-        <img
-  className="instruction-video"
-  src="/Female-Doctor-Transparent-PNG.png"
-  alt="Female Doctor"
-/>
-
+          <img className="instruction-video" src="/Female-Doctor-Transparent-PNG.png" alt="Female Doctor" />
         </div>
 
         <div className="right-section1">
           <CurveHeader />
-          <button className="back-home-button" onClick={() => navigate("/")}>
+          <button className="back-home-button" onClick={() => navigate("/", { state: { lang: selectedLang } })}>
             <IoMdHome size={35} />
           </button>
+
           <div className="signin-wrapper">
             <div className="form-container">
-              <h2>Doctor Sign Up</h2>
-
+              <h2>{t.doctorSignUp}</h2>
               {errors.general && <div className="general-error">{errors.general}</div>}
               {success && <div className="success-message">{success}</div>}
 
-              {!otpSent && (
+              {/* Step 1: Personal Details */}
+              {step === 1 && (
                 <>
-                  <div className="input-wrapper">
-                    <input
-                      ref={phoneRef}
-                      type="text"
-                      name="phone"
-                      placeholder="Phone Number"
-                      value={form.phone}
-                      onChange={handleChange}
-                      className={`custom-input ${errors.phone ? "input-error" : ""}`}
-                    />
-                    {errors.phone && <div className="field-error">{errors.phone}</div>}
-                  </div>
-
-                  <div className="input-wrapper">
-                    <input
-                      type="text"
-                      name="doctor_name"
-                      placeholder="Doctor Name"
-                      value={form.doctor_name}
-                      onChange={handleChange}
-                      className={`custom-input ${errors.doctor_name ? "input-error" : ""}`}
-                    />
-                    {errors.doctor_name && <div className="field-error">{errors.doctor_name}</div>}
-                  </div>
-
-                  <button className="signin-button" onClick={handleRequestOTP}>
-                    Generate OTP
-                  </button>
+                  {[
+                    { name: "doctor_name", icon: "👨‍⚕️", placeholder: t.namePlaceholder },
+                    { name: "phone", icon: "📞", placeholder: t.phonePlaceholder, ref: phoneRef },
+                    { name: "email_id", icon: "📧", placeholder: t.emailPlaceholder },
+                    { name: "license_id", icon: "🆔", placeholder: t.licensePlaceholder },
+                  ].map(({ name, icon, placeholder, ref }) => (
+                    <div className="input-wrapper" key={name}>
+                      <div className="input-row">
+                        <span className="input-icon">{icon}</span>
+                        <input
+                          type="text"
+                          ref={ref || null}
+                          name={name}
+                          placeholder={placeholder}
+                          value={form[name]}
+                          onChange={handleChange}
+                          className={`custom-input ${errors[name] ? "input-error" : ""}`}
+                        />
+                      </div>
+                      {errors[name] && <div className="field-error">{errors[name]}</div>}
+                    </div>
+                  ))}
                 </>
               )}
 
-              {otpSent && !otpVerified && (
+              {/* Step 2: Education */}
+              {step === 2 && (
+                <>
+                  {[
+                    { name: "qualification", icon: "🎓", placeholder: t.qualificationPlaceholder },
+                    { name: "specialization", icon: "🩺", placeholder: t.specializationPlaceholder },
+                  ].map(({ name, icon, placeholder }) => (
+                    <div className="input-wrapper" key={name}>
+                      <div className="input-row">
+                        <span className="input-icon">{icon}</span>
+                        <input
+                          type="text"
+                          name={name}
+                          placeholder={placeholder}
+                          value={form[name]}
+                          onChange={handleChange}
+                          className={`custom-input ${errors[name] ? "input-error" : ""}`}
+                        />
+                      </div>
+                      {errors[name] && <div className="field-error">{errors[name]}</div>}
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {/* Step 3: OTP */}
+              {step === 3 && (
                 <>
                   <div className="input-wrapper">
-                    <input
-                      ref={otpRef}
-                      type="text"
-                      name="otp"
-                      placeholder="Enter OTP"
-                      value={form.otp}
-                      onChange={handleChange}
-                      className={`custom-input ${errors.otp ? "input-error" : ""}`}
-                    />
+                    <div className="input-row">
+                      <span className="input-icon">🔐</span>
+                      <input
+                        ref={otpRef}
+                        type="text"
+                        name="otp"
+                        placeholder={t.otpPlaceholder}
+                        value={form.otp}
+                        onChange={handleChange}
+                        className={`custom-input ${errors.otp ? "input-error" : ""}`}
+                      />
+                    </div>
                     {errors.otp && <div className="field-error">{errors.otp}</div>}
                   </div>
-
-                  <button className="signin-button" onClick={handleVerifyOTP}>
-                    Verify OTP
-                  </button>
+                  <button className="resend-otp-btn" onClick={handleRequestOTP}>{t.resendOTP}</button>
                 </>
               )}
 
-              {otpVerified && (
+              {/* Step 4: Password Setup */}
+              {step === 4 && (
                 <>
-                  <div className="input-wrapper">
-                    <input
-                      ref={passwordRef}
-                      type="password"
-                      name="password"
-                      placeholder="Password"
-                      value={form.password}
-                      onChange={handleChange}
-                      className={`custom-input ${errors.password ? "input-error" : ""}`}
-                    />
-                    {errors.password && <div className="field-error">{errors.password}</div>}
-                  </div>
-
-                  <div className="input-wrapper">
-                    <input
-                      type="password"
-                      name="rePassword"
-                      placeholder="Confirm Password"
-                      value={form.rePassword}
-                      onChange={handleChange}
-                      className={`custom-input ${errors.rePassword ? "input-error" : ""}`}
-                    />
-                    {errors.rePassword && <div className="field-error">{errors.rePassword}</div>}
-                  </div>
-
-                  <button className="signin-button" onClick={handleSignUp}>
-                    Sign Up
-                  </button>
+                  {[
+                    { name: "password", icon: "🔑", placeholder: t.passwordPlaceholder },
+                    { name: "rePassword", icon: "🔒", placeholder: t.rePasswordPlaceholder },
+                  ].map(({ name, icon, placeholder }) => (
+                    <div className="input-wrapper" key={name}>
+                      <div className="input-row">
+                        <span className="input-icon">{icon}</span>
+                        <input
+                          ref={name === "password" ? passwordRef : null}
+                          type="password"
+                          name={name}
+                          placeholder={placeholder}
+                          value={form[name]}
+                          onChange={handleChange}
+                          className={`custom-input ${errors[name] ? "input-error" : ""}`}
+                        />
+                      </div>
+                      {errors[name] && <div className="field-error">{errors[name]}</div>}
+                    </div>
+                  ))}
                 </>
               )}
 
+              <button onClick={step === 3 && !otpVerified ? handleVerifyOTP : handleNext} className="submit-btn">
+                {step === 3 && !otpVerified ? t.verifyOTP : step === 4 ? t.signUpButton : t.nextButton}
+              </button>
               <p className="signup-text">
-                Already have an account?{" "}
-                <span className="signup-link" onClick={() => navigate("/signin")}>
-                  Sign In
-                </span>
-              </p>
+  {t.alreadyAccount}{" "}
+  <span
+    className="signup-link"
+    onClick={() => navigate("/signin", { state: { lang: selectedLang } })}
+  >
+    {t.signInLink}
+  </span>
+</p>
+
+             
             </div>
           </div>
         </div>

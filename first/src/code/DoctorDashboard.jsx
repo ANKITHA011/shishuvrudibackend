@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+// ...imports remain unchanged
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
 import { IoMdHome } from "react-icons/io";
-import { GrView } from "react-icons/gr";  // Added icon import
+import { GrView } from "react-icons/gr";
 import axios from "axios";
 import "./DoctorDashboard.css";
 
-// Header Component
 const CurveHeader = ({ doctorName }) => (
   <div className="curve-separator5">
     <svg viewBox="0 0 500 80" preserveAspectRatio="none">
@@ -44,12 +44,21 @@ const DoctorDashboard = () => {
   const navigate = useNavigate();
   const doctorPhone = localStorage.getItem("phone");
 
-  useEffect(() => {
-    fetchNotifications();
-    fetchDoctorName();
+  const [timerNow, setTimerNow] = useState(Date.now());
+
+  const fetchDoctorName = useCallback(async () => {
+    try {
+      const res = await axios.get(
+        `http://localhost:5000/chatbot/doctor_name/${doctorPhone}`
+      );
+      setDoctorName(res.data?.doctor_name || doctorPhone);
+    } catch (err) {
+      console.error("Failed to fetch doctor name:", err);
+      setDoctorName(doctorPhone);
+    }
   }, [doctorPhone]);
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const res = await axios.get(
         `http://localhost:5000/chatbot/chatbot/notifications/${doctorPhone}`
@@ -72,8 +81,11 @@ const DoctorDashboard = () => {
             childAge = child.age;
             childGender = child.gender;
             parentName = child.parent_name;
-          } catch (childErr) {
-            console.error("Child info error:", childErr);
+          } catch (err) {
+            console.error(
+              `Error fetching child info for child_id ${notif.child_id}:`,
+              err
+            );
           }
 
           return {
@@ -88,31 +100,72 @@ const DoctorDashboard = () => {
 
       setNotifications(enhancedNotifications);
     } catch (err) {
-      console.error("Failed to fetch notifications", err);
+      console.error("Failed to fetch notifications:", err);
     }
+  }, [doctorPhone]);
+
+  useEffect(() => {
+    if (!doctorPhone) {
+      navigate("/signin");
+      return;
+    }
+
+    fetchNotifications();
+    fetchDoctorName();
+
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
+  }, [doctorPhone, fetchNotifications, fetchDoctorName, navigate]);
+
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      setTimerNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timerInterval);
+  }, []);
+
+  const formatWaitingTime = (timestamp) => {
+    if (!timestamp) return "N/A";
+
+    const createdTime = new Date(timestamp);
+    const diffMs = timerNow - createdTime;
+    if (diffMs < 0) return "0m 0s";
+
+    const minutes = Math.floor(diffMs / 60000);
+    const seconds = Math.floor((diffMs % 60000) / 1000);
+
+    return `${minutes}m ${seconds}s`;
   };
 
-  const fetchDoctorName = async () => {
-    try {
-      const res = await axios.get(
-        `http://localhost:5000/chatbot/doctor_name/${doctorPhone}`
-      );
-      setDoctorName(res.data?.doctor_name || doctorPhone);
-    } catch (err) {
-      console.error("Failed to fetch doctor name", err);
-      setDoctorName(doctorPhone);
+  const getWaitingTimeDisplay = (notif) => {
+    if (
+      notif.chatnotiactionatkenbydoctor === "yes" &&
+      notif.final_waiting_time
+    ) {
+      return `${notif.final_waiting_time} (Started)`;
     }
+    return formatWaitingTime(notif.timestamp);
   };
 
   const handleReply = async (childId) => {
+    const notification = notifications.find((n) => n.child_id === childId);
+    if (!notification) return;
+
+    const createdTime = new Date(notification.timestamp);
+    const diffMs = Date.now() - createdTime;
+    const minutes = Math.floor(diffMs / 60000);
+    const seconds = Math.floor((diffMs % 60000) / 1000);
+    const finalWaitingTime = `${minutes}m ${seconds}s`;
+
     try {
       await axios.post("http://localhost:5000/chatbot/notification/action_taken", {
         child_id: childId,
         doctor_id: doctorPhone,
+        final_waiting_time: finalWaitingTime,
       });
-      fetchNotifications(); // Optional: refresh after action
+      await fetchNotifications();
     } catch (err) {
-      console.error("Failed to update action_taken", err);
+      console.error("Failed to update action_taken status:", err);
     }
 
     navigate(`/parentchat/${childId}/Parent/${doctorPhone}`);
@@ -124,9 +177,9 @@ const DoctorDashboard = () => {
         child_id: notification.child_id,
         doctor_id: doctorPhone,
       });
-      fetchNotifications(); // Optional: refresh after action
+      await fetchNotifications();
     } catch (err) {
-      console.error("Failed to update seen status", err);
+      console.error("Failed to update seen status:", err);
     }
 
     setSelectedNotification(notification);
@@ -160,7 +213,6 @@ const DoctorDashboard = () => {
           <div className="no-notifications">No new notifications</div>
         ) : (
           <div className="notification-table-wrapper">
-            {/* Header Table */}
             <table className="notification-table">
               <thead>
                 <tr>
@@ -168,12 +220,11 @@ const DoctorDashboard = () => {
                   <th>Gender</th>
                   <th>Child Age</th>
                   <th>Date</th>
+                  <th>Waiting Time</th>
                   <th>Action</th>
                 </tr>
               </thead>
             </table>
-
-            {/* Scrollable Body */}
             <div className="notification-table-body">
               <table className="notification-table">
                 <tbody>
@@ -183,9 +234,20 @@ const DoctorDashboard = () => {
                       <td>{item.childGender}</td>
                       <td>{item.childAge}</td>
                       <td>
-                        {new Date(item.timestamp).toLocaleDateString("en-IN", {
-                          timeZone: "Asia/Kolkata",
-                        })}
+                        {(item.timestamp)}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            color:
+                              item.chatnotiactionatkenbydoctor === "yes"
+                                ? "green"
+                                : "red",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {getWaitingTimeDisplay(item)}
+                        </span>
                       </td>
                       <td>
                         <button
@@ -211,27 +273,15 @@ const DoctorDashboard = () => {
         )}
       </div>
 
-      {/* Modal */}
       {showModal && selectedNotification && (
         <div className="modal-overlay">
           <div className="modal-content">
             <h3>Notification Details</h3>
-            <p>
-              <strong>Child Name:</strong> {selectedNotification.childName}
-            </p>
-            <p>
-              <strong>Age:</strong> {selectedNotification.childAge}
-            </p>
-            <p>
-              <strong>Gender:</strong> {selectedNotification.childGender}
-            </p>
-            <p>
-              <strong>Action Taken:</strong>{" "}
-              {selectedNotification.action_taken ? "Yes" : "No"}
-            </p>
-            <button className="close-button" onClick={handleCloseModal}>
-              Close
-            </button>
+            <p><strong>Child Name:</strong> {selectedNotification.childName}</p>
+            <p><strong>Age:</strong> {selectedNotification.childAge}</p>
+            <p><strong>Gender:</strong> {selectedNotification.childGender}</p>
+            <p><strong>Action Taken:</strong> {selectedNotification.chatnotiactionatkenbydoctor === "yes" ? "Yes" : "No"}</p>
+            <button className="close-button" onClick={handleCloseModal}>Close</button>
           </div>
         </div>
       )}

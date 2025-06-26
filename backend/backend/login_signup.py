@@ -142,22 +142,40 @@ def login():
         cur = mysql.connection.cursor()
 
         if role == "doctor":
-            cur.execute("SELECT password FROM doctor WHERE phone_number = %s", (phone,))
+            cur.execute("SELECT doctor_id, password, doctor_name FROM doctor WHERE phone_number = %s", (phone,))
+            user = cur.fetchone()
+            cur.close()
+
+            if not user:
+                return send_response("login_not_registered", 401, field="phone", lang=lang)
+
+            if user[1] != password:
+                return send_response("login_wrong_password", 401, field="password", lang=lang)
+
+            # ✅ Return doctor info
+            return jsonify({
+                "message": t(lang, "login_success"),
+                "userid": user[0],          # doctor_id
+                "name": user[2]             # doctor_name
+            }), 200
+
         else:
-            cur.execute("SELECT userpassword FROM tblusers WHERE userphoneno = %s", (phone,))
+            cur.execute("SELECT userid, userpassword, userparentname FROM tblusers WHERE userphoneno = %s", (phone,))
+            user = cur.fetchone()
+            cur.close()
 
-        user = cur.fetchone()
-        cur.close()
+            if not user:
+                return send_response("login_not_registered", 401, field="phone", lang=lang)
 
-        if not user:
-            return send_response("login_not_registered", 401, field="phone", lang=lang)
+            if user[1] != password:
+                return send_response("login_wrong_password", 401, field="password", lang=lang)
 
-        # 🔐 Optional: check hashed password
-        # if not check_password_hash(user[0], password):
-        if user[0] != password:
-            return send_response("login_wrong_password", 401, field="password", lang=lang)
-
-        return send_response("login_success", 200, lang=lang)
+            # ✅ Return user info
+            return jsonify({
+                "message": t(lang, "login_success"),
+                "userid": user[0],         # userid from tblusers
+                "name": user[2]            # userparentname
+            }), 200
 
     except Exception:
         traceback.print_exc()
@@ -238,3 +256,83 @@ def save_child_info():
         print(f"Database error: {e}")
         traceback.print_exc()
         return jsonify({"message": "Failed to save child info"}), 500
+
+@login_signup_bp.route("/doctor/signup", methods=["POST"])
+def doctor_signup():
+    try:
+        data = request.json
+        lang = get_lang()
+
+        phone = data.get("phone", "").strip()
+        password = data.get("password", "").strip()
+        doctor_name = data.get("doctor_name", "").strip()
+        license_id = data.get("license_id", "").strip()
+        email_id = data.get("email_id", "").strip()
+        qualification = data.get("qualification", "").strip()
+        specialization = data.get("specialization", "").strip()
+
+        # Validate mandatory fields
+        if not all([phone, password, doctor_name, license_id, email_id, qualification, specialization]):
+            return send_response("account_missing_fields", 400, lang=lang)
+
+        # Validate phone format
+        if not is_valid_phone(phone):
+            return send_response("account_invalid_phone", 400, lang=lang)
+
+        # Validate password length
+        if len(password) < 6:
+            return send_response("account_invalid_password", 400, lang=lang)
+
+        cur = mysql.connection.cursor()
+
+        # Check if phone already exists only in doctor table (not users)
+        cur.execute("SELECT doctor_id FROM doctor WHERE phone_number = %s", (phone,))
+        if cur.fetchone():
+            cur.close()
+            return send_response("account_exists", 409, lang=lang)
+
+    
+
+        # Insert doctor data
+        cur.execute("""
+            INSERT INTO doctor (
+                doctor_name, password, license_id, email_id, phone_number, qualification, specialization
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (doctor_name, password, license_id, email_id, phone, qualification, specialization))
+
+        mysql.connection.commit()
+        cur.close()
+
+        # Clear OTP cache for this phone
+        otp_store.pop(phone, None)
+
+        return send_response("account_created", 201, lang=lang)
+
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        traceback.print_exc()
+        return send_response("account_error", 500, lang=get_lang())
+@login_signup_bp.route("/request_otp2", methods=["POST"])
+def request_otp2():
+    try:
+        lang = get_lang()
+        phone = request.json.get("phone", "").strip()
+
+        if not is_valid_phone(phone):
+            return send_response("otp_invalid", 400, lang=lang)
+
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT doctor_id FROM doctor WHERE phone_number = %s", (phone,))
+        if cur.fetchone():
+            cur.close()
+            return send_response("otp_exists", 409, lang=lang)
+        cur.close()
+
+        otp = str(random.randint(1000, 9999))
+        otp_store[phone] = {"otp": otp, "timestamp": time.time()}
+        print(f"[DEBUG] OTP for {phone}: {otp}")
+
+        return send_response("otp_sent", lang=lang)
+    except Exception:
+        traceback.print_exc()
+        return send_response("otp_failed", 500, lang=get_lang())

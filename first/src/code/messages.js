@@ -1,0 +1,42 @@
+export const UI_MESSAGES = {
+  en: {
+    signIn: "Sign In",
+    parent: "Parent",
+    pediatrician: "Pediatrician",
+    phonePlaceholder: "Phone Number",
+    passwordPlaceholder: "Password",
+    forgotPassword: "Forgot Password?",
+    noAccount: "Don’t have an account?",
+    signup: "Sign up as",
+    signingIn: "Signing in...",
+    phoneRequired: "Phone number is required.",
+    passwordRequired: "Password is required.",
+  },
+  hi: {
+    signIn: "साइन इन करें",
+    parent: "माता-पिता",
+    pediatrician: "बाल रोग विशेषज्ञ",
+    phonePlaceholder: "फ़ोन नंबर",
+    passwordPlaceholder: "पासवर्ड",
+    forgotPassword: "पासवर्ड भूल गए?",
+    noAccount: "खाता नहीं है?",
+    signup: "के रूप में साइन अप करें",
+    signingIn: "साइन इन हो रहा है...",
+    phoneRequired: "फ़ोन नंबर आवश्यक है।",
+    passwordRequired: "पासवर्ड आवश्यक है।",
+  },
+  kn: {
+    signIn: "ಸೈನ್ ಇನ್",
+    parent: "ಪೋಷಕರು",
+    pediatrician: "ಮಕ್ಕಳ ವೈದ್ಯರು",
+    phonePlaceholder: "ದೂರವಾಣಿ ಸಂಖ್ಯೆ",
+    passwordPlaceholder: "ಗುಪ್ತಪದ",
+    forgotPassword: "ಪಾಸ್ವರ್ಡ್ ಮರೆತಿರಾ?",
+    noAccount: "ಖಾತೆ ಇಲ್ಲವೇ?",
+    signup: "ಹೆಸರು ನೋಂದಾಯಿಸಿ",
+    signingIn: "ಸೈನ್ ಇನ್ ಆಗುತ್ತಿದೆ...",
+    phoneRequired: "ದೂರವಾಣಿ ಸಂಖ್ಯೆ ಅಗತ್ಯವಿದೆ.",
+    passwordRequired: "ಗುಪ್ತಪದ ಅಗತ್ಯವಿದೆ.",
+  }
+  // Add more languages here...
+};

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
-
+import translations from "./translations3";
 import "./ChildInfo.css";
 
 import { Volume2, Mic, LogOut } from "lucide-react";
@@ -12,294 +12,285 @@ import { IoIosAddCircle } from "react-icons/io";
 import { BsThreeDotsVertical } from "react-icons/bs";
 
 function ChildInfo() {
-  const [phone, setPhone] = useState(null);
-  const [parentName, setParentName] = useState(null);
-  const [children, setChildren] = useState([]);
-  const [loadingChildren, setLoadingChildren] = useState(true);
-  const [loadingLocation, setLoadingLocation] = useState(true);
-  const [error, setError] = useState("");
+  const [phone, setPhone] = useState(null);
+  const [parentName, setParentName] = useState(null);
+  const [children, setChildren] = useState([]);
+  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [loadingLocation, setLoadingLocation] = useState(true);
+  const [error, setError] = useState("");
+  
+  const location = useLocation();
+  const navigate = useNavigate();
+  const dummyInputRef = useRef(null);
+  const [visibleActions, setVisibleActions] = useState({});
 
-  const [region, setRegion] = useState("");
-  const [country, setCountry] = useState("");
+  const [region, setRegion] = useState("");
+  const [country, setCountry] = useState("");
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  // Initialize language state
+  const [language, setLanguage] = useState("en");
+  const t = translations[language] || translations.en;
 
-  const [visibleActions, setVisibleActions] = useState({});
-  const dummyInputRef = useRef(null);
+  useEffect(() => {
+    // Check for language in location state first, then localStorage
+    const langFromLocation = location.state?.lang;
+    const langFromStorage = localStorage.getItem("selectedLang");
+    const lang = langFromLocation || langFromStorage || "en";
+    
+    setLanguage(lang);
+    localStorage.setItem("selectedLang", lang);
 
-  useEffect(() => {
-    if (dummyInputRef.current) {
-      dummyInputRef.current.focus();
-    }
-  }, []);
-
-  // Load phone and optionally cached children
-  useEffect(() => {
-    const savedPhone = localStorage.getItem("phone");
-    const cachedChildren = localStorage.getItem("childList");
-
-    if (savedPhone) {
-      setPhone(savedPhone);
-
-      if (cachedChildren) {
-        try {
-          const parsed = JSON.parse(cachedChildren);
-          setChildren(parsed);
-          setLoadingChildren(false);
-        } catch (e) {
-          console.error("Error parsing cached child list", e);
-        }
-      }
-    } else {
-      setError("Phone not found. Redirecting to login...");
-      setTimeout(() => navigate("/"), 2000);
-    }
-  }, [navigate]);
-
-  const fetchChildren = useCallback(async (phoneNumber) => {
-    if (!phoneNumber) return;
-
-    setLoadingChildren(true);
-    setError("");
-
-    try {
-      const response = await axios.post("http://localhost:5000/chatbot/children", { phone: phoneNumber });
-      setChildren(response.data);
-      localStorage.setItem("childList", JSON.stringify(response.data));
-
-      const initialVisibleActions = {};
-      response.data.forEach(child => {
-        initialVisibleActions[child.id] = false;
-      });
-      setVisibleActions(initialVisibleActions);
-    } catch (err) {
-      console.error("Fetch children error:", err);
-      setError("Failed to fetch children.");
-    } finally {
-      setLoadingChildren(false);
-    }
-  }, []);
-
-  // ChildInfo.js
-
-// ... (other imports and component setup)
-
-const fetchParentName = useCallback(async (phoneNumber) => {
-  try {
-    const res = await axios.post("http://localhost:5000/chatbot/get_parent_name", { phone: phoneNumber });
-
-    // --- START DEBUGGING CONSOLE LOGS ---
-    console.log("API Response for get_parent_name:", res); // Log the full response object
-    console.log("Response data (res.data):", res.data); // Log just the data payload
-
-    if (res.data?.parent_name) {
-      console.log("Found parent name in response:", res.data.parent_name);
-      setParentName(res.data.parent_name);
-      // Optional: Store in localStorage for instant display on future loads
-      localStorage.setItem("parentName", res.data.parent_name);
-    } else {
-      console.warn("No 'parent_name' key found in API response data, or value is null/undefined.");
-      // If the backend explicitly returns {"parent_name": null} or just {}
-      setParentName(null);
-      localStorage.removeItem("parentName"); // Clear if no name is returned
+    if (dummyInputRef.current) {
+      dummyInputRef.current.focus();
     }
-    // --- END DEBUGGING CONSOLE LOGS ---
+  }, [location.state]);
 
-  } catch (err) {
-    console.error("Failed to fetch parent name. Error details:", err);
-    // If there's an error, ensure parentName state is cleared
-    setParentName(null);
-    localStorage.removeItem("parentName");
-  }
-}, []); // Dependencies: empty array or add any external variables used inside (like setParentName, but it's stable)
+  useEffect(() => {
+    const savedPhone = localStorage.getItem("phone");
+    const cachedChildren = localStorage.getItem("childList");
 
-  const fetchUserLocation = useCallback(async () => {
-    setLoadingLocation(true);
-    try {
-      const res = await axios.get("http://localhost:5000/api/userinfo");
-      setRegion(res.data.region || "Unknown Region");
-      setCountry(res.data.country?.trim() || "Unknown Country");
-    } catch (err) {
-      console.error("Failed to fetch user location", err);
-      setRegion("Unknown Region");
-      setCountry("Unknown Country");
-    } finally {
-      setLoadingLocation(false);
-    }
-  }, []);
+    if (savedPhone) {
+      setPhone(savedPhone);
 
-  useEffect(() => {
-    if (phone) {
-      fetchChildren(phone);
-      fetchParentName(phone);
-    }
-  }, [phone, fetchChildren, fetchParentName, location]);
+      if (cachedChildren) {
+        try {
+          const parsed = JSON.parse(cachedChildren);
+          setChildren(parsed);
+          setLoadingChildren(false);
+        } catch (e) {
+          console.error("Error parsing cached child list", e);
+        }
+      }
+    } else {
+      setError(t.phoneNotFound);
+      setTimeout(() => navigate("/"), 2000);
+    }
+  }, [navigate, t.phoneNotFound]);
 
-  useEffect(() => {
-    fetchUserLocation();
-  }, [fetchUserLocation]);
+  const fetchChildren = useCallback(async (phoneNumber) => {
+    if (!phoneNumber) return;
 
-  useEffect(() => {
-    if (location.state?.refresh && phone) {
-      fetchChildren(phone);
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state, phone, fetchChildren]);
+    setLoadingChildren(true);
+    setError("");
 
-  const startChat = (child) => {
-    localStorage.removeItem("childInfo");
-    localStorage.setItem("childInfo", JSON.stringify({ ...child, phone }));
-    navigate("/chatbot");
-  };
+    try {
+      const response = await axios.post("http://localhost:5000/chatbot/children", { 
+        phone: phoneNumber 
+      });
+      setChildren(response.data);
+      localStorage.setItem("childList", JSON.stringify(response.data));
 
-  const handleDelete = async (childId) => {
-    if (window.confirm("Are you sure you want to delete this child?")) {
-      try {
-        await axios.delete(`http://localhost:5000/chatbot/children/${childId}`);
-        fetchChildren(phone);
-      } catch (error) {
-        console.error("Delete error:", error);
-        setError("Failed to delete child.");
-      }
-    }
-  };
+      const initialVisibleActions = {};
+      response.data.forEach(child => {
+        initialVisibleActions[child.id] = false;
+      });
+      setVisibleActions(initialVisibleActions);
+    } catch (err) {
+      console.error("Fetch children error:", err);
+      setError(t.fetchChildrenError);
+    } finally {
+      setLoadingChildren(false);
+    }
+  }, [t.fetchChildrenError]);
 
-  const goToNewEntry = () => navigate("/new-child");
+  const fetchParentName = useCallback(async (phoneNumber) => {
+    try {
+      const res = await axios.post("http://localhost:5000/chatbot/get_parent_name", { 
+        phone: phoneNumber 
+      });
+      if (res.data?.parent_name) {
+        setParentName(res.data.parent_name);
+        localStorage.setItem("parentName", res.data.parent_name);
+      } else {
+        setParentName(null);
+        localStorage.removeItem("parentName");
+      }
+    } catch (err) {
+      console.error("Failed to fetch parent name:", err);
+      setParentName(null);
+      localStorage.removeItem("parentName");
+    }
+  }, []);
 
-  const getGenderBadgeClass = (gender) => {
-    const lowerGender = gender?.toLowerCase();
-    if (lowerGender === 'male') return 'gender-male';
-    if (lowerGender === 'female') return 'gender-female';
-    return 'gender-other';
-  };
+  const fetchUserLocation = useCallback(async () => {
+    setLoadingLocation(true);
+    try {
+      const res = await axios.get("http://localhost:5000/api/userinfo");
+      setRegion(res.data.region || t.unknownRegion);
+      setCountry(res.data.country?.trim() || t.unknownCountry);
+    } catch (err) {
+      console.error("Failed to fetch location:", err);
+      setRegion(t.unknownRegion);
+      setCountry(t.unknownCountry);
+    } finally {
+      setLoadingLocation(false);
+    }
+  }, [t.unknownRegion, t.unknownCountry]);
 
-  const toggleActionButtons = (childId) => {
-    setVisibleActions(prev => ({
-      ...prev,
-      [childId]: !prev[childId]
-    }));
-  };
+  useEffect(() => {
+    if (phone) {
+      fetchChildren(phone);
+      fetchParentName(phone);
+    }
+  }, [phone, fetchChildren, fetchParentName, location]);
 
-  return (
-    <div className="main-wrapper-two5">
-      <input
-        ref={dummyInputRef}
-        type="text"
-        placeholder="Hidden dummy input"
-        style={{ position: "absolute", left: "-9999px", opacity: 0 }}
-        tabIndex={-1}
-      />
+  useEffect(() => {
+    fetchUserLocation();
+  }, [fetchUserLocation]);
 
-      <div className="sidebar">
-        <ul>
-          <li onClick={() => navigate("/")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <IoMdHome size={35} />Home
-          </li>
-          <li onClick={goToNewEntry} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <IoIosAddCircle size={35} />Add Child
-          </li>
-          <li onClick={() => navigate("/signin", { state: { lang: 'en' } })} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <LogOut size={30} />Sign Out
-          </li>
-        </ul>
-      </div>
+  useEffect(() => {
+    if (location.state?.refresh && phone) {
+      fetchChildren(phone);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, phone, fetchChildren]);
 
-      <div className="signin-wrapper5">
-        <div className="form-container2">
-          <div className="curve-separator5">
-            <svg viewBox="0 0 500 80" preserveAspectRatio="none">
-              <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
-              <path d="M0,0 C200,80 400,20 500,40 L500,0 L0,0 Z" className="wave wave-front5" />
-            </svg>
-            <div className="curve-content5">
-              <div className="curve-left-section">
-                <div className="curve-icon5">
-                  <img src="/baby-icon.png" alt="Baby Icon" />
-                </div>
-                <span className="curve-app-title">Shishu Vriddhi</span>
-              </div>
-              <div className="curve-middle-section">
-                <span className="curve-text5">CHILD INFORMATION</span>
-              </div>
-              {error && <div className="general-error">{error}</div>}
-              <div className="curve-right-section">
-                Signed in as {parentName || "Loading..."}
-                <span>{loadingLocation ? "Loading Location..." : `${region}, ${country}`}</span>
-              </div>
-            </div>
-          </div>
+  const startChat = (child) => {
+    localStorage.removeItem("childInfo");
+    localStorage.setItem("childInfo", JSON.stringify({ ...child, phone }));
+    navigate("/chatbot");
+  };
 
-          <div className="content-area">
-            {loadingChildren ? (
-              <div className="loading-container">
-                <div>Loading children...</div>
-              </div>
-            ) : children.length > 0 ? (
-              <>
-                <h2>Children Information</h2>
-                <div className="child-table-container">
-                  <table className="child-table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Age</th>
-                        <th>Gender</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {children.map((child) => (
-                        <tr key={child.id}>
-                          <td className="child-name-cell"><strong>{child.name}</strong></td>
-                          <td>
-                            <span className="age-display">{child.age !== null ? `${child.age}` : "N/A"}</span>
-                          </td>
-                          <td>
-                            <span className={`gender-badge ${getGenderBadgeClass(child.gender)}`}>
-                              {child.gender}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="action-buttons">
-                              <button className="btn-chat" onClick={() => startChat(child)}>
-                                <IoIosChatboxes size={20} color="black" />
-                              </button>
-                              <button className="btn-milestone" onClick={() => {
-                                localStorage.setItem("childInfo", JSON.stringify(child));
-                                navigate("/milestone");
-                              }}>
-                                📊
-                              </button>
-                              <button className="btn-bmi" onClick={() => {
-                                localStorage.setItem("childInfo", JSON.stringify(child));
-                                navigate("/bmicheck");
-                              }}>
-                                📏
-                              </button>
-                              <button className="btn-delete" onClick={() => handleDelete(child.id)}>
-                                <MdDelete size={20} color="black" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                   </table>
-                </div>
-              </>
-            ) : (
-              <div className="empty-state">
-                <h2>No children found</h2>
-                <p>Start by adding your first child's information to begin tracking their development.</p>
-                <button onClick={goToNewEntry}>➕ Add New Child</button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const handleDelete = async (childId) => {
+    if (window.confirm(t.deleteConfirm)) {
+      try {
+        await axios.delete(`http://localhost:5000/chatbot/children/${childId}`);
+        fetchChildren(phone);
+      } catch (error) {
+        console.error("Delete error:", error);
+        setError(t.deleteChildError);
+      }
+    }
+  };
+
+  const goToNewEntry = () => navigate("/new-child");
+
+  const getGenderBadgeClass = (gender) => {
+    const lowerGender = gender?.toLowerCase();
+    if (lowerGender === 'male') return 'gender-male';
+    if (lowerGender === 'female') return 'gender-female';
+    return 'gender-other';
+  };
+
+  return (
+    <div className="main-wrapper-two5">
+      <input
+        ref={dummyInputRef}
+        type="text"
+        placeholder="Hidden dummy input"
+        style={{ position: "absolute", left: "-9999px", opacity: 0 }}
+        tabIndex={-1}
+      />
+
+      <div className="sidebar">
+        <ul>
+          <li onClick={() => navigate("/")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <IoMdHome size={35} />{t.home}
+          </li>
+          <li onClick={goToNewEntry} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <IoIosAddCircle size={35} />{t.addChild}
+          </li>
+          <li onClick={() => navigate("/signin", { state: { lang: language } })} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <LogOut size={30} />{t.signOut}
+          </li>
+        </ul>
+      </div>
+
+      <div className="signin-wrapper5">
+        <div className="form-container2">
+          <div className="curve-separator5">
+            <svg viewBox="0 0 500 80" preserveAspectRatio="none">
+              <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
+              <path d="M0,0 C200,80 400,20 500,40 L500,0 L0,0 Z" className="wave wave-front5" />
+            </svg>
+            <div className="curve-content5">
+              <div className="curve-left-section">
+                <div className="curve-icon5">
+                  <img src="/baby-icon.png" alt="Baby Icon" />
+                </div>
+                <span className="curve-app-title">Shishu Vriddhi</span>
+              </div>
+              <div className="curve-middle-section">
+                <span className="curve-text5">{t.childInfo}</span>
+              </div>
+              {error && <div className="general-error">{error}</div>}
+              <div className="curve-right-section">
+                {t.signedInAs} {parentName || t.loading}
+                <span>{loadingLocation ? t.loadingLocation : `${region}, ${country}`}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="content-area">
+            {loadingChildren ? (
+              <div className="loading-container">
+                <div>{t.loadingChildren}</div>
+              </div>
+            ) : children.length > 0 ? (
+              <>
+                <h2>{t.childrenInfo}</h2>
+                <div className="child-table-container">
+                  <table className="child-table">
+                    <thead>
+                      <tr>
+                        <th>{t.name}</th>
+                        <th>{t.age}</th>
+                        <th>{t.gender}</th>
+                        <th>{t.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {children.map((child) => (
+                        <tr key={child.id}>
+                          <td className="child-name-cell"><strong>{child.name}</strong></td>
+                          <td>
+                            <span className="age-display">{child.age !== null ? `${child.age}` : "N/A"}</span>
+                          </td>
+                          <td>
+                            <span className={`gender-badge ${getGenderBadgeClass(child.gender)}`}>
+                              {child.gender}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="action-buttons">
+                              <button className="btn-chat" onClick={() => startChat(child)}>
+                                <IoIosChatboxes size={20} color="black" />
+                              </button>
+                              <button className="btn-milestone" onClick={() => {
+                                localStorage.setItem("childInfo", JSON.stringify(child));
+                                navigate("/milestone");
+                              }}>
+                                📊
+                              </button>
+                              <button className="btn-bmi" onClick={() => {
+                                localStorage.setItem("childInfo", JSON.stringify(child));
+                                navigate("/bmicheck");
+                              }}>
+                                📏
+                              </button>
+                              <button className="btn-delete" onClick={() => handleDelete(child.id)}>
+                                <MdDelete size={20} color="black" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">
+                <h2>{t.noChildren}</h2>
+                <p>{t.addPrompt}</p>
+                <button onClick={goToNewEntry}>{t.addButton}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default ChildInfo;

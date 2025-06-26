@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate, useLocation } from "react-router-dom";
 import { IoMdHome } from "react-icons/io";
+import { FaUserMd, FaUser } from "react-icons/fa";
 import "./signin.css";
 import "./App.css";
+import { UI_MESSAGES } from "./messages"; // 👈 Translation file
 
 const CurveHeader = () => (
   <div className="curve-separator1">
@@ -21,6 +23,10 @@ const CurveHeader = () => (
 );
 
 function SignIn() {
+  const location = useLocation();
+  const selectedLang = location.state?.lang || "en"; // ✅ Language from previous screen
+  const msg = UI_MESSAGES[selectedLang] || UI_MESSAGES.en;
+
   const [form, setForm] = useState({
     phone: "",
     password: "",
@@ -31,7 +37,6 @@ function SignIn() {
   const [loading, setLoading] = useState(false);
   const phoneInputRef = useRef(null);
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     phoneInputRef.current?.focus();
@@ -44,8 +49,8 @@ function SignIn() {
 
   const validateForm = () => {
     const temp = {};
-    if (!form.phone) temp.phone = "Phone number is required.";
-    if (!form.password) temp.password = "Password is required.";
+    if (!form.phone) temp.phone = msg.phoneRequired || "Phone number is required.";
+    if (!form.password) temp.password = msg.passwordRequired || "Password is required.";
     return temp;
   };
 
@@ -58,23 +63,32 @@ function SignIn() {
 
     setLoading(true);
     try {
-      await axios.post("http://localhost:5000/login/login", form);
+      const res = await axios.post("http://localhost:5000/login/login", {
+        ...form,
+        language: selectedLang, // ✅ Pass selected language to backend
+      });
+
+      const { userid, name } = res.data;
+
       localStorage.setItem("phone", form.phone);
       localStorage.setItem("role", form.role);
 
       if (form.role === "doctor") {
+        localStorage.setItem("doctorId", userid);
+        localStorage.setItem("doctorName", name);
         navigate("/doctor-dashboard");
       } else {
+        localStorage.setItem("userId", userid);
+        localStorage.setItem("parentName", name);
         navigate("/child-info");
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "Login failed.";
+      const msgText = err.response?.data?.message || "Login failed.";
       const field = err.response?.data?.field;
-
       if (field && (field === "phone" || field === "password")) {
-        setErrors({ [field]: msg });
+        setErrors({ [field]: msgText });
       } else {
-        setErrors({ general: msg });
+        setErrors({ general: msgText });
       }
     } finally {
       setLoading(false);
@@ -99,26 +113,26 @@ function SignIn() {
 
           <div className="signin-wrapper">
             <div className="form-container">
-              <h2>Sign In</h2>
+              <h2>{msg.signIn}</h2>
 
-              {/* Role Selection at the Top */}
               <div className="input-wrapper">
                 <div className="input-row">
-                  <span className="input-icon">🧑‍⚕️</span>
+                  <span className="input-icon">
+                    {form.role === "doctor" ? <FaUserMd size={20} /> : <FaUser size={20} />}
+                  </span>
                   <select
                     name="role"
                     value={form.role}
                     onChange={handleChange}
                     className={`custom-input ${errors.role ? "input-error" : ""}`}
                   >
-                    <option value="user">Parent</option>
-                    <option value="doctor">Pediatrician</option>
+                    <option value="user">{msg.parent}</option>
+                    <option value="doctor">{msg.pediatrician}</option>
                   </select>
                 </div>
                 {errors.role && <div className="field-error">{errors.role}</div>}
               </div>
 
-              {/* Phone Input */}
               <div className="input-wrapper">
                 <div className="input-row">
                   <span className="input-icon">📞</span>
@@ -126,7 +140,7 @@ function SignIn() {
                     ref={phoneInputRef}
                     type="text"
                     name="phone"
-                    placeholder="Phone Number"
+                    placeholder={msg.phonePlaceholder}
                     value={form.phone}
                     onChange={handleChange}
                     className={`custom-input ${errors.phone ? "input-error" : ""}`}
@@ -135,54 +149,42 @@ function SignIn() {
                 {errors.phone && <div className="field-error">{errors.phone}</div>}
               </div>
 
-              {/* Password Input */}
               <div className="input-wrapper">
                 <div className="input-row">
                   <span className="input-icon">🔒</span>
                   <input
                     type="password"
                     name="password"
-                    placeholder="Password"
+                    placeholder={msg.passwordPlaceholder}
                     value={form.password}
                     onChange={handleChange}
                     className={`custom-input ${errors.password ? "input-error" : ""}`}
                   />
                 </div>
                 {errors.password && <div className="field-error">{errors.password}</div>}
-
-                {/* Forgot Password */}
                 <p className="forgot-password-text">
-                  <span
-                    className="forgot-password-link"
-                    onClick={() => navigate("/forgot-password")}
-                  >
-                    Forgot Password?
+                  <span className="forgot-password-link" onClick={() => navigate("/forgot-password")}>
+                    {msg.forgotPassword}
                   </span>
                 </p>
               </div>
 
-              {/* General Error */}
               {errors.general && <div className="general-error">{errors.general}</div>}
 
-              {/* Submit Button */}
               <button className="signin-button" onClick={handleLogin} disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? msg.signingIn : msg.signIn}
               </button>
 
-              {/* Sign Up Link */}
               <p className="signup-text">
-                Don’t have an account?{" "}
+                {msg.noAccount}{" "}
                 <span
                   className="signup-link"
                   onClick={() => {
-                    if (form.role === "doctor") {
-                      navigate("/signup-doctor");
-                    } else {
-                      navigate("/signup");
-                    }
+                    const path = form.role === "doctor" ? "/signup-doctor" : "/signup";
+                    navigate(path, { state: { lang: selectedLang } });
                   }}
                 >
-                  Sign up as {form.role === "doctor" ? "Doctor" : "Parent"}
+                  {msg.signup} {form.role === "doctor" ? msg.pediatrician : msg.parent}
                 </span>
               </p>
             </div>

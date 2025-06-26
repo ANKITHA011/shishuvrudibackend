@@ -631,13 +631,19 @@ function ChatBot() {
                 {!chatEnded ? (
                     <div className="input-row">
                         <input
-                            ref={inputRef}
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Ask a question about your child..."
-                            disabled={loading}
-                        />
+    ref={inputRef}
+    type="text"
+    value={input}
+    onChange={(e) => setInput(e.target.value)}
+    onKeyDown={(e) => {
+        if (e.key === 'Enter' && !loading && input.trim()) {
+            handleSend();
+        }
+    }}
+    placeholder="Ask a question about your child..."
+    disabled={loading}
+/>
+
                         {!input.trim() ? (
                             <button onClick={() => console.log("Mic clicked")} title="Speak" className="mic-button" disabled={loading}>
                                 <Mic />

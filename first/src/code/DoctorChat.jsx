@@ -229,11 +229,18 @@ function DoctorChat() {
         {/* Input Field */}
         <div className="input-row">
           <input
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder={`Ask ${doctorActualName} a question...`}
-          />
+  type="text"
+  value={input}
+  onChange={e => setInput(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter" && input.trim()) {
+      e.preventDefault();
+      handleSend();
+    }
+  }}
+  placeholder={`Ask ${doctorActualName} a question...`}
+/>
+
           {!input.trim() ? (
             <button className="mic-button"><Mic /></button>
           ) : (

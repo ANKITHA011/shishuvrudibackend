@@ -212,12 +212,19 @@ function ParentChat() {
 
         {/* Input */}
         <div className="input-row">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your message to the parent..."
-          />
+        <input
+  type="text"
+  value={input}
+  onChange={(e) => setInput(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter" && input.trim()) {
+      e.preventDefault();
+      handleSend();
+    }
+  }}
+  placeholder="Type your message to the parent..."
+/>
+
           {!input.trim() ? (
             <button className="mic-button"><Mic /></button>
           ) : (

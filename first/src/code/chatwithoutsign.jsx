@@ -426,12 +426,19 @@ function Withoutsignin() {
                     {!chatEnded && (
                         <div className="input-row">
                             <input
-                                ref={inputRef}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                placeholder="Type your message..."
-                                disabled={loading || messages[messages.length - 1]?.options?.length > 0}
-                            />
+    ref={inputRef}
+    type="text"
+    value={input}
+    onChange={(e) => setInput(e.target.value)}
+    onKeyDown={(e) => {
+        if (e.key === 'Enter' && !loading && input.trim()) {
+            handleSend();
+        }
+    }}
+    placeholder="Ask a question about your child..."
+    disabled={loading}
+/>
+
                             {!input.trim() ? (
                                 <button onClick={handleSpeechToText} title="Speak" className="mic-button" disabled={loading}>
                                     <Mic />
