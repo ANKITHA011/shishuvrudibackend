@@ -21,7 +21,22 @@ const translations = {
     phoneNotFound: "Phone not found. Redirecting to login...",
     fetchChildrenError: "Failed to fetch children.",
     deleteChildError: "Failed to delete child.",
-    loading: "Loading..."
+    loading: "Loading...",
+    childname: "Child Name",
+    dateofbirth: "Child Name",
+     heightcm: "Height(cm)",
+    weightkg: "Weight(Kg)",
+    registerchild: "Register Child",
+    genderOptions: { male: "Male", female: "Female", other: "Other" },
+    nameRequired: "Child's name is required.",
+   nameInvalid: "Enter a valid name (letters and spaces only, 2–50 characters).",
+     dobisrequired: "Date of birth is required.",
+      selectgender: "Please select a gender.",
+   entervalidheight: "Please enter a valid height in cm.",
+     entervalidweight: "Please enter a valid weight in kg.",
+   failedtosave: "Failed to Register child.",
+      errorsavinginfo: "Error registering child . Please try again."
+
   },
   hi: {
     home: "होम",
@@ -69,7 +84,21 @@ const translations = {
     phoneNotFound: "ಫೋನ್ ಕಂಡುಬಂದಿಲ್ಲ. ಲಾಗಿನ್ ಪುಟಕ್ಕೆ ಮರುನಿರ್ದೇಶನಗೊಳ್ಳುತ್ತಿದೆ...",
     fetchChildrenError: "ಮಕ್ಕಳ ಮಾಹಿತಿ ಪಡೆಯಲು ವಿಫಲವಾಗಿದೆ",
     deleteChildError: "ಮಗುವನ್ನು ಅಳಿಸಲು ವಿಫಲವಾಗಿದೆ",
-    loading: "ಲೋಡ್ ಆಗುತ್ತಿದೆ..."
+    loading: "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    childname: "ಮಗುವಿನ ಹೆಸರು",
+    dateofbirth: "ಹುಟ್ಟಿದ ದಿನಾಂಕ",
+     heightcm: "ಎತ್ತರ (ಸೆಂಮೀ)",
+    weightkg: "ತೂಕ (ಕೆಜಿ)",
+    registerChild: "ಮಗುವನ್ನು ನೋಂದಾಯಿಸಿ",
+    genderOptions: { male: "ಪುರುಷ", female: "ಹೆಣ್ಣು", other: "ಇತರೆ" },
+   nameRequired: "ಮಗುವಿನ ಹೆಸರು ಅಗತ್ಯವಿದೆ..",
+   nameInvalid: "ಮಾನ್ಯವಾದ ಹೆಸರನ್ನು ನಮೂದಿಸಿ (ಅಕ್ಷರಗಳು ಮತ್ತು ಸ್ಥಳಗಳು ಮಾತ್ರ, 2–50 ಅಕ್ಷರಗಳು).",
+    dobisrequired: "ಜನ್ಮ ದಿನಾಂಕದ ಅಗತ್ಯವಿದೆ.",
+      selectgender: "ದಯವಿಟ್ಟು ಲಿಂಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+   entervalidheight: "ದಯವಿಟ್ಟು ಸರಿಯಾದ ಎತ್ತರವನ್ನು ಸೆಂ.ಮೀ.ಗಳಲ್ಲಿ ನಮೂದಿಸಿ.",
+     entervalidweight: "ದಯವಿಟ್ಟು ಸರಿಯಾದ ತೂಕವನ್ನು ಕೆಜಿಯಲ್ಲಿ ನಮೂದಿಸಿ.",
+   failedtosave: "ನೋಂದಾಯಿಸಲು ವಿಫಲವಾಗಿದೆ",
+      errorsavinginfo: "ಮಗುವಿನ ಮಾಹಿತಿಯನ್ನು ನೋಂದಾಯಿಸುವಲ್ಲಿ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   }
 };
 

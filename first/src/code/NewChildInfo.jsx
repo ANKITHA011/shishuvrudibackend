@@ -6,6 +6,8 @@ import "./newchild.css";
 import { LogOut } from "lucide-react";
 import { IoMdHome } from "react-icons/io";
 import { PiBabyBold } from "react-icons/pi";
+import translations from "./translations3";
+
 
 const CurveHeader = () => {
   const navigate = useNavigate();
@@ -54,34 +56,55 @@ function NewChildInfo() {
   const nameInputRef = useRef(null);
 
   const langMap = { en: "english", hi: "hindi", kn: "kannada" };
-  const langCode = localStorage.getItem("language") || "en";
+  const langCode = localStorage.getItem("selectedLang") || "en";
   const langKey = langMap[langCode] || "english";
+
+  // Initialize language state
+  const [language, setLanguage] = useState("en");
+  const t = translations[language] || translations.en;
+   const dummyInputRef = useRef(null);
+
+  useEffect(() => {
+    // Check for language in location state first, then localStorage
+    const langFromLocation = location.state?.lang;
+    const langFromStorage = localStorage.getItem("selectedLang");
+    const lang = langFromLocation || langFromStorage || "en";
+    
+    setLanguage(lang);
+    localStorage.setItem("selectedLang", lang);
+
+     if (dummyInputRef.current) {
+      dummyInputRef.current.focus();
+    }
+  }, [location.state]);
 
   const labels = {
     english: {
       title: "Enter Child Information",
       detailsTitle: "Child Details",
-      name: "Child's Name",
-      dateOfBirth: "Date of Birth",
-      gender: "Gender",
-      genderOptions: { male: "Male", female: "Female", other: "Other" },
-      height: "Height (cm)",
-      weight: "Weight (kg)",
+      name: t.childname,
+      dateOfBirth: t.dateofbirth,
+      gender: t.gender,
+      //genderOptions: { male: "Male", female: "Female", other: "Other" },
+      genderOptions: t.genderOptions,
+      height: t.heightcm,
+      weight: t.weightkg,
       submit: "Start Chat",
+      registerchild:t.registerchild
     },
   };
 
   const errorMsgs = {
     english: {
       phoneNotFound: "❌ Phone not found. Redirecting to login...",
-      nameRequired: "Child's name is required.",
-      nameInvalid: "Enter a valid name (letters and spaces only, 2–50 characters).",
-      dobRequired: "Date of birth is required.",
-      genderRequired: "Please select a gender.",
-      heightRequired: "Please enter a valid height in cm.",
-      weightRequired: "Please enter a valid weight in kg.",
-      saveFailed: "Failed to save child info.",
-      saveError: "Error saving child info. Please try again.",
+      nameRequired: t.nameRequired,
+      nameInvalid: t.nameInvalid,
+      dobRequired: t.dobisrequired,
+      genderRequired: t.selectgender,
+      heightRequired: t.entervalidheight,
+      weightRequired:t.entervalidweight,
+      saveFailed: t.failedtosave,
+      saveError: t.errorsavinginfo,
     },
   };
 
@@ -159,7 +182,7 @@ function NewChildInfo() {
       <div className="signin-wrapper100">
         {/* CurveHeader is now part of the form's content */}
         <CurveHeader />
-        <h2>ADD CHILD</h2>
+        <h2>{t.addChild}</h2>
          <div className="signin-inner100">
         {/* Child's Name */}
         <div className="input-wrapper100">
@@ -181,7 +204,7 @@ function NewChildInfo() {
 
         {/* Date of Birth */}
         <div className="input-wrapper100">
-          <label className="field-label100">{currentLabels.dateOfBirth}</label>
+          <label className="field-label100">{t.dateofbirth || "⚠️ Missing Translation: addChild"}</label>
           <div className="input-row100">
             <span className="input-icon100">🎂</span>
             <input
@@ -253,7 +276,7 @@ function NewChildInfo() {
         {errors.general && <div className="general-error">{errors.general}</div>}
 
         <button className="signin-button" onClick={handleSubmit}>
-          REGISTER CHILD
+          {currentLabels.registerchild}
         </button>
       </div>
      </div>
