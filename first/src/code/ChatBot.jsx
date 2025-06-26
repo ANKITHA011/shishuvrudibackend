@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import jsPDF from 'jspdf';
 import { useNavigate } from "react-router-dom";
 import { Volume2, Mic, LogOut, ArrowDownCircle, FileText, Code, History, Home, Baby } from "lucide-react";
 // import './chat.css'; // This CSS file needs to be handled externally or styles moved inline/to Tailwind
@@ -6,7 +7,6 @@ import { Volume2, Mic, LogOut, ArrowDownCircle, FileText, Code, History, Home, B
 // For jsPDF, assume it's loaded via CDN in the HTML environment
 // You will need to add <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 // to your HTML file where this React app is mounted.
-const jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
 
 import axios from 'axios';
 
@@ -75,7 +75,11 @@ function ChatBot() {
     const [doctors, setDoctors] = useState([]);
     const [availabilityMap, setAvailabilityMap] = useState({}); // State for doctor availability
     const [availabilityIntervalId, setAvailabilityIntervalId] = useState(null); // To store interval ID for polling
-
+    
+    // NEW STATES FOR WHISPER INTEGRATION
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorder = useRef(null);
+    const audioChunks = useRef([]);
     const chatWindowRef = useRef(null);
     const inputRef = useRef(null);
     const utteranceRef = useRef(null);
@@ -326,13 +330,76 @@ function ChatBot() {
 
         synth.speak(utter);
     };
-
-    const handleSend = async () => {
-        if (!input.trim() || !childInfo) return;
+    // NEW: Function to start recording audio
+    const startRecording = async () => {
+        if (isSpeaking) { // Stop any ongoing speech before recording
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder.current = new MediaRecorder(stream);
+            audioChunks.current = [];
+            mediaRecorder.current.ondataavailable = (event) => {
+                audioChunks.current.push(event.data);
+            };
+            mediaRecorder.current.onstop = async () => {
+                const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' }); // Use webm for broader compatibility
+                console.log("Audio recorded:", audioBlob);
+                // Send to backend for Whisper transcription
+                setLoading(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'recording.webm'); // Ensure correct filename and type
+                    const response = await axios.post("http://localhost:5000/chatbot/speech-to-text", formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    });
+                    const transcribedText = response.data.text;
+                    if (transcribedText) {
+                        setInput(transcribedText); // Set the transcribed text into the input field
+                        // Optionally, auto-send the message if you want
+                        // handleSend(transcribedText);
+                    } else {
+                        addBotMessage("Could not transcribe audio. Please try again.", []);
+                    }
+                } catch (error) {
+                    console.error("Error sending audio to Whisper backend:", error);
+                    addBotMessage("Error processing speech. Please try typing your message.", []);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            mediaRecorder.current.start();
+            setIsRecording(true);
+            console.log("Recording started...");
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+            addBotMessage("Microphone access denied or an error occurred. Please ensure microphone permissions are granted.", []);
+        }
+    };
+    // NEW: Function to stop recording audio
+    const stopRecording = () => {
+        if (mediaRecorder.current && isRecording) {
+            mediaRecorder.current.stop();
+            setIsRecording(false);
+            console.log("Recording stopped.");
+        }
+    };
+    const handleMicButtonClick = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    };
+    const handleSend = async (messageToSend = input) => {
+        if (!messageToSend.trim() || !childInfo) return;
 
         const newUserMsg = {
             sender: "Parent",
-            text: input,
+            text: messageToSend,
             timestamp: formatTimestamp(new Date())
         };
         setMessages(prev => [...prev, newUserMsg]);
@@ -700,7 +767,7 @@ function ChatBot() {
                     {loading && <div className="typing">🧑‍⚕️ Typing...</div>}
                 </div>
 
-                {!chatEnded ? (
+                             {!chatEnded ? (
                     <div className="input-row">
                         <input
                             ref={inputRef}
@@ -713,16 +780,21 @@ function ChatBot() {
                                 }
                             }}
                             placeholder="Ask a question about your child..."
-                            disabled={loading}
+                            disabled={loading || isRecording}
                         />
 
-                        {!input.trim() ? (
-                            <button onClick={() => console.log("Mic clicked")} title="Speak" className="mic-button" disabled={loading}>
-                                <Mic />
-                            </button>
-                        ) : (
-                            <button onClick={handleSend} disabled={loading}>Send</button>
-                        )}
+                        {/* Updated Mic Button */}
+                        <button
+                            onClick={handleMicButtonClick}
+                            title={isRecording ? "Stop Recording" : "Start Recording"}
+                            className="mic-button"
+                            disabled={loading}
+                            style={{ backgroundColor: isRecording ? 'red' : 'transparent' }} // Visual feedback for recording
+                        >
+                            <Mic color={isRecording ? 'white' : 'black'} />
+                        </button>
+
+                        <button onClick={handleSend} disabled={loading || !input.trim()}>Send</button>
                     </div>
                 ) : (
                     <div className="end-chat">
@@ -759,7 +831,6 @@ function ChatBot() {
                                     onClick={() => handleStartDoctorChat(doc)}
                                     className="chat-button"
                                     // Disable button if doctor is offline
-                                    disabled={!availabilityMap[doc.doctor_id]}
                                 >
                                     Start Chat
                                 </button>
