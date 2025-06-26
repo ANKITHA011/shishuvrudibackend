@@ -1035,3 +1035,95 @@ def get_doctor_availability(doctor_id):
     finally:
         if conn:
             conn.close()
+from flask import Flask, request, jsonify, Blueprint
+from flask_cors import CORS
+import whisper
+import os
+import logging
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Load a multilingual Whisper model
+logging.info("Loading multilingual Whisper model...")
+try:
+    whisper_model = whisper.load_model("small")  # or "medium", "large"
+    logging.info("Multilingual Whisper model loaded successfully.")
+except Exception as e:
+    logging.error(f"Failed to load Whisper model: {e}")
+    raise e
+
+# Setup upload folder
+UPLOAD_FOLDER = 'uploads'
+ABS_UPLOAD_FOLDER = os.path.abspath(UPLOAD_FOLDER)
+os.makedirs(ABS_UPLOAD_FOLDER, exist_ok=True)
+
+@chatbot_bp.route('/speech-to-text', methods=['POST'])
+def speech_to_text():
+    logging.info("Received request to /speech-to-text")
+
+    if 'audio' not in request.files:
+        logging.warning("No 'audio' file part in the request.")
+        return jsonify({"error": "No audio file provided"}), 400
+
+    audio_file = request.files['audio']
+    if audio_file.filename == '':
+        logging.warning("Empty filename in the request.")
+        return jsonify({"error": "No selected file"}), 400
+
+    try:
+        # Save uploaded file
+        filepath = os.path.join(ABS_UPLOAD_FOLDER, audio_file.filename)
+        audio_file.save(filepath)
+        logging.info(f"Audio file saved to: {filepath}")
+
+        # Transcribe with language auto-detection
+        logging.info("Transcribing with Whisper...")
+        result = whisper_model.transcribe(filepath)  # You could add `language='xx'` if you know the language
+        transcribed_text = result.get("text", "")
+        detected_language = result.get("language", "unknown")
+
+        logging.info(f"Transcription completed. Detected language: {detected_language}, Text: {transcribed_text}")
+
+        # Remove temporary file
+        try:
+            os.remove(filepath)
+        except OSError as cleanup_err:
+            logging.warning(f"Could not delete temp file: {filepath}. Error: {cleanup_err}")
+
+        return jsonify({
+            "text": transcribed_text,
+            "language": detected_language
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error in transcription: {e}", exc_info=True)
+        return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
+
+@chatbot_bp.route('/doctor/availabilitys/<string:doctor_id>', methods=['GET'])
+def get_doctor_availability2(doctor_id):
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Query the database for the 'available' status
+        # In PostgreSQL, boolean is directly returned as True/False
+        cur.execute("SELECT available FROM login_sessions WHERE doctor_id = %s", (doctor_id,))
+        result = cur.fetchone()
+
+        if result:
+            available_status = result[0] # This will be True or False directly
+            return jsonify({'doctor_id': doctor_id, 'available': available_status})
+        else:
+            # If doctor_id not found, assume offline or handle as an error
+            return jsonify({'doctor_id': doctor_id, 'available': False}), 404
+    except Exception as e:
+        print(f"Error fetching doctor availability: {e}")
+        return jsonify({'error': 'Failed to fetch availability', 'details': str(e)}), 500
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
