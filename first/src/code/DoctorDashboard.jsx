@@ -4,9 +4,10 @@ import { LogOut } from "lucide-react";
 import { IoMdHome } from "react-icons/io";
 import { GrView } from "react-icons/gr";
 import axios from "axios";
+import translations from "./translations8";
 import "./DoctorDashboard.css";
 
-const CurveHeader = ({ doctorName, isOnline }) => (
+const CurveHeader = ({ doctorName, isOnline, t }) => (
   <div className="curve-separator5">
     <svg viewBox="0 0 500 80" preserveAspectRatio="none">
       <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
@@ -20,13 +21,13 @@ const CurveHeader = ({ doctorName, isOnline }) => (
         <span className="curve-app-title">Shishu Vriddhi</span>
       </div>
       <div className="curve-middle-section">
-        <span className="curve-text5">NOTIFICATION</span>
+        <span className="curve-text5">{t.notification}</span>
       </div>
       <div className="curve-right-section">
         <div className="child-info-line">
-          Signed in as {doctorName}
+          {t.signedInAs} {doctorName}
           <span style={{ marginLeft: "10px", color: isOnline ? "green" : "gray", fontWeight: "bold" }}>
-            ● {isOnline ? "Online" : "Offline"}
+            ● {isOnline ? t.online : t.offline}
           </span>
         </div>
       </div>
@@ -42,41 +43,40 @@ const DoctorDashboard = () => {
   const [timerNow, setTimerNow] = useState(Date.now());
   const [isOnline, setIsOnline] = useState(false);
   const [isUserActive, setIsUserActive] = useState(true);
-
   const navigate = useNavigate();
   const doctorPhone = localStorage.getItem("phone");
-
+  const selectedLang = localStorage.getItem("selectedLang") || "en";
+  const t = translations[selectedLang] || translations.en;
   let inactivityTimeout = null;
 
   const updateLastAction = useCallback(async (isActive = true) => {
     try {
-      await axios.post(`http://localhost:5000/chatbot/update_last_action/${doctorPhone}`, {
-        available: isActive
-      });
+      await axios.post(`http://localhost:5000/chatbot/update_last_action/${doctorPhone}`, { available: isActive });
     } catch (err) {
-      console.error("Error updating last action time:", err);
+      console.error(err);
     }
   }, [doctorPhone]);
 
   const handleUserActivity = useCallback(() => {
     if (!isUserActive) {
       setIsUserActive(true);
-      updateLastAction(true); // Became active again
+      updateLastAction(true);
     }
-
     clearTimeout(inactivityTimeout);
     inactivityTimeout = setTimeout(() => {
       setIsUserActive(false);
-      updateLastAction(false); // Became inactive
+      updateLastAction(false);
     }, 5000);
   }, [isUserActive, updateLastAction]);
 
   useEffect(() => {
-    const events = ["mousemove", "mousedown", "keydown", "scroll", "touchstart"];
-    events.forEach(e => window.addEventListener(e, handleUserActivity));
-
+    ["mousemove","mousedown","keydown","scroll","touchstart"].forEach(e =>
+      window.addEventListener(e, handleUserActivity)
+    );
     return () => {
-      events.forEach(e => window.removeEventListener(e, handleUserActivity));
+      ["mousemove","mousedown","keydown","scroll","touchstart"].forEach(e =>
+        window.removeEventListener(e, handleUserActivity)
+      );
       clearTimeout(inactivityTimeout);
     };
   }, [handleUserActivity]);
@@ -105,19 +105,14 @@ const DoctorDashboard = () => {
         axios.get(`http://localhost:5000/chatbot/chatbot/notifications/${doctorPhone}`),
         fetchActionStatuses()
       ]);
-
       const actionStatusMap = new Map();
-      actionStatusList.forEach(status => {
-        actionStatusMap.set(status.chatnotichildid, status);
-      });
-
+      actionStatusList.forEach(s => actionStatusMap.set(s.chatnotichildid, s));
       const enhanced = await Promise.all(notifRes.data.map(async notif => {
         let child = {};
         try {
           const res = await axios.get(`http://localhost:5000/chatbot/child/info/${notif.child_id}`);
           child = res.data;
         } catch {}
-
         const actionData = actionStatusMap.get(notif.child_id);
         return {
           ...notif,
@@ -126,13 +121,12 @@ const DoctorDashboard = () => {
           childGender: child.gender || "N/A",
           parentName: child.parent_name || "N/A",
           chatnotiactionatkenbydoctor: actionData?.chatnotiactionatkenbydoctor || "no",
-          action_time: actionData?.action_time || null
+          action_time: actionData?.action_time || null,
         };
       }));
-
       setNotifications(enhanced);
     } catch (err) {
-      console.error("Fetch notifications failed:", err);
+      console.error(err);
     }
   }, [doctorPhone, fetchActionStatuses]);
 
@@ -141,63 +135,43 @@ const DoctorDashboard = () => {
       const res = await axios.get(`http://localhost:5000/chatbot/doctor/availability/${doctorPhone}`);
       setIsOnline(res.data.available);
     } catch (err) {
-      console.error("Failed to fetch availability:", err);
+      console.error(err);
     }
   }, [doctorPhone]);
 
   useEffect(() => {
-    if (!doctorPhone) {
-      navigate("/signin");
-      return;
-    }
-
-    fetchDoctorName();
-    fetchNotifications();
-    fetchAvailability();
-    updateLastAction(true); // Initial
-
+    if (!doctorPhone) return navigate("/signin");
+    fetchDoctorName(); fetchNotifications(); fetchAvailability();
+    updateLastAction(true);
     const interval = setInterval(() => {
       fetchNotifications();
       fetchAvailability();
       if (isUserActive) updateLastAction(true);
     }, 10000);
-
     return () => clearInterval(interval);
   }, [doctorPhone, isUserActive, fetchDoctorName, fetchNotifications, fetchAvailability, updateLastAction, navigate]);
 
   useEffect(() => {
-    const t = setInterval(() => setTimerNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const tId = setInterval(() => setTimerNow(Date.now()), 1000);
+    return () => clearInterval(tId);
   }, []);
 
-  const formatActionTime = (timeStr) => {
-    try {
-      const date = new Date(timeStr);
-      return date.toLocaleString();
-    } catch {
-      return timeStr;
-    }
+  const formatActionTime = timeStr => {
+    try { return new Date(timeStr).toLocaleString(selectedLang); } catch { return timeStr; }
   };
-
-  const formatWaitingTime = (timestamp) => {
+  const formatWaitingTime = timestamp => {
     if (!timestamp) return "N/A";
-    const created = new Date(timestamp);
-    const diffMs = timerNow - created;
+    const diffMs = timerNow - new Date(timestamp);
     const mins = Math.floor(diffMs / 60000);
     const secs = Math.floor((diffMs % 60000) / 1000);
     return `${mins}m ${secs}s`;
   };
 
-  const handleReply = async (childId) => {
+  const handleReply = async childId => {
     const notification = notifications.find(n => n.child_id === childId);
     if (!notification) return;
-
-    const created = new Date(notification.timestamp);
-    const diff = Date.now() - created;
-    const mins = Math.floor(diff / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    const finalWait = `${mins}m ${secs}s`;
-
+    const diff = Date.now() - new Date(notification.timestamp);
+    const finalWait = `${Math.floor(diff/60000)}m ${Math.floor((diff%60000)/1000)}s`;
     try {
       await axios.post("http://localhost:5000/chatbot/notification/action_taken", {
         child_id: childId,
@@ -207,11 +181,11 @@ const DoctorDashboard = () => {
       await fetchNotifications();
       navigate(`/parentchat/${childId}/Parent/${doctorPhone}`);
     } catch (err) {
-      console.error("Reply failed:", err);
+      console.error(err);
     }
   };
 
-  const handleView = async (notification) => {
+  const handleView = async notification => {
     try {
       await axios.post("http://localhost:5000/chatbot/notification/mark_seen", {
         child_id: notification.child_id,
@@ -221,7 +195,7 @@ const DoctorDashboard = () => {
       setSelectedNotification(notification);
       setShowModal(true);
     } catch (err) {
-      console.error("Failed to mark as seen:", err);
+      console.error(err);
     }
   };
 
@@ -230,36 +204,36 @@ const DoctorDashboard = () => {
     setSelectedNotification(null);
   };
 
+  
+
   return (
     <div className="page-layout">
-      <CurveHeader doctorName={doctorName} isOnline={isOnline} />
-
+      <CurveHeader doctorName={doctorName} isOnline={isOnline} t={t} />
       <div className="left-nav1">
         <ul>
           <li onClick={() => navigate("/")}>
-            <IoMdHome size={24} /> Home
+            <IoMdHome size={24} /> {t.home}
           </li>
-          <li onClick={() => navigate("/signin")}>
-            <LogOut size={24} /> Sign Out
+          <li onClick={() => navigate("/signin",{ state: { lang: selectedLang } })}>
+            <LogOut size={24} /> {t.signOut}
           </li>
         </ul>
       </div>
-
       <div className="doctor-dashboard-container">
-        <h2 className="dashboard-header">Notifications</h2>
+        <h2 className="dashboard-header">{t.notifications}</h2>
         {notifications.length === 0 ? (
-          <div className="no-notifications">No new notifications</div>
+          <div className="no-notifications">{t.noNotifications}</div>
         ) : (
           <div className="notification-table-wrapper">
             <table className="notification-table">
               <thead>
                 <tr>
-                  <th>Child Name</th>
-                  <th>Gender</th>
-                  <th>Child Age</th>
-                  <th>Date</th>
-                  <th>Waiting Time</th>
-                  <th>Action</th>
+                  <th>{t.childName}</th>
+                  <th>{t.gender}</th>
+                  <th>{t.childAge}</th>
+                  <th>{t.date}</th>
+                  <th>{t.waitingTime}</th>
+                  <th>{t.action}</th>
                 </tr>
               </thead>
             </table>
@@ -271,18 +245,22 @@ const DoctorDashboard = () => {
                       <td>{item.childName}</td>
                       <td>{item.childGender}</td>
                       <td>{item.childAge}</td>
-                      <td>{new Date(item.timestamp).toLocaleDateString()}</td>
+                      <td>{new Date(item.timestamp).toLocaleDateString(selectedLang)}</td>
                       <td>
                         <span style={{
                           color: item.chatnotiactionatkenbydoctor === "yes" ? "black" : "red",
                           fontWeight: "bold"
                         }}>
-                          {item.chatnotiactionatkenbydoctor === "yes" ? "Viewed" : formatWaitingTime(item.timestamp)}
+                          {item.chatnotiactionatkenbydoctor === "yes"
+                            ? t.viewed
+                            : formatWaitingTime(item.timestamp)}
                         </span>
                       </td>
                       <td>
-                        <button className="reply-button" onClick={() => handleReply(item.child_id)}>Chat Now</button>
-                        <button className="view-button" onClick={() => handleView(item)} aria-label="View Notification">
+                        <button className="reply-button" onClick={() => handleReply(item.child_id)}>
+                          {t.chatNow}
+                        </button>
+                        <button className="view-button" onClick={() => handleView(item)} aria-label={t.notificationDetails}>
                           <GrView size={18} />
                         </button>
                       </td>
@@ -294,17 +272,16 @@ const DoctorDashboard = () => {
           </div>
         )}
       </div>
-
       {showModal && selectedNotification && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h3>Notification Details</h3>
-            <p><strong>Child Name:</strong> {selectedNotification.childName}</p>
-            <p><strong>Age:</strong> {selectedNotification.childAge}</p>
-            <p><strong>Gender:</strong> {selectedNotification.childGender}</p>
-            <p><strong>Action Taken:</strong> {selectedNotification.chatnotiactionatkenbydoctor === "yes" ? "Yes" : "No"}</p>
-            <p><strong>Action Time:</strong> {selectedNotification.action_time ? formatActionTime(selectedNotification.action_time) : "N/A"}</p>
-            <button className="close-button" onClick={handleCloseModal}>Close</button>
+            <h3>{t.notificationDetails}</h3>
+            <p><strong>{t.childName}:</strong> {selectedNotification.childName}</p>
+            <p><strong>{t.age}:</strong> {selectedNotification.childAge}</p>
+            <p><strong>{t.gender}:</strong> {selectedNotification.childGender}</p>
+            <p><strong>{t.actionTaken}:</strong> {selectedNotification.chatnotiactionatkenbydoctor === "yes" ? t.yes : t.no}</p>
+            <p><strong>{t.actionTime}:</strong> {selectedNotification.action_time ? formatActionTime(selectedNotification.action_time) : "N/A"}</p>
+            <button className="close-button" onClick={handleCloseModal}>{t.close}</button>
           </div>
         </div>
       )}

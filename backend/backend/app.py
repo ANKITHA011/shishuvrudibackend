@@ -9,6 +9,7 @@ from login_signup import login_signup_bp, init_mysql
 from chatbot_module import chatbot_bp
 from chatwithoutsign import chat_without_signin_bp
 from milestone import milestone_bp
+from graph import graph_bp
 
 # Flask App Initialization
 app = Flask(__name__)
@@ -29,7 +30,7 @@ app.register_blueprint(login_signup_bp, url_prefix="/login")
 app.register_blueprint(chatbot_bp, url_prefix="/chatbot")
 app.register_blueprint(chat_without_signin_bp)
 app.register_blueprint(milestone_bp, url_prefix="/milestone")
-
+app.register_blueprint(graph_bp,url_prefix="/graph")
 # Region-to-language mapping
 REGION_LANGUAGE_MAP = {
     'Maharashtra': ('Marathi', 'mr'),

@@ -24,7 +24,7 @@
 }
 
 .left-nav1 {
-    width: 220px;
+    width: 260px;
     background-color: var(--background-light);
     height: 100vh;
     padding-top: 120px; /* Adjust padding-top to account for the new full-width header */
@@ -315,7 +315,7 @@ background: none;
 .fixed-child-info {
   position: fixed;
   top: 100px;
-  left: 220px;
+  left: 260px;
   right: 0;
   background: var(--white);
   padding: 20px 24px;
@@ -346,3 +346,76 @@ background: none;
     line-height: 1;
 }
 
+/* Add these to your existing CSS file */
+
+.status-dot {
+    margin-left: 8px;
+    font-size: 12px;
+    vertical-align: middle;
+}
+
+.status-dot.online {
+    color: #4CAF50;
+}
+
+.status-dot.offline {
+    color: #F44336;
+}
+
+.status-text {
+    margin-left: 4px;
+    font-size: 14px;
+    color: #666;
+    vertical-align: middle;
+}
+
+.doctor-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 4px;
+    gap: 5px;
+}
+
+/* Existing styles... */
+/* Doctor Status Styles */
+.doctor-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9em;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f5f5f5;
+}
+
+.status-indicator.online {
+    color: #4CAF50;
+}
+
+.status-indicator.offline {
+    color: #F44336;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.status-dot.online {
+    background: #4CAF50;
+}
+
+.status-dot.offline {
+    background: #F44336;
+}

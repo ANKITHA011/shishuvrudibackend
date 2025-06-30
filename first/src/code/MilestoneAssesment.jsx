@@ -1,5 +1,3 @@
-// MilestoneAssessment.jsx
-
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Award, ArrowLeft, LogOut } from "lucide-react";
@@ -9,6 +7,96 @@ import { PiBabyBold } from "react-icons/pi";
 import { IoChatbubbleEllipsesSharp } from "react-icons/io5";
 import axios from "axios";
 
+const translations = {
+  en: {
+    home: "Home",
+    childInfo: "Child Info",
+    chat: "Chat",
+    history: "History",
+    cgm: "CGM",
+    signOut: "Sign Out",
+    milestoneAssessment: "MILESTONE ASSESSMENT",
+    signInAs: "Sign in as",
+    loading: "Loading milestone assessment...",
+    childName: "Child Name",
+    age: "Age",
+    personalizedRecommendations: "Personalized Development Recommendations",
+    concern: "Concern",
+    takeAssessmentAgain: "Take Assessment Again",
+    noPastResponses: "No past milestone responses available for this child.",
+    session: "Session",
+    answerNewQuestions: "Answer New Questions",
+    previous: "Previous",
+    next: "Next",
+    question: "Question",
+    of: "of",
+    complete: "Complete",
+    yes: "Yes",
+    no: "No",
+    dontKnow: "Don't know",
+    getDevelopmentReport: "Get Development Report",
+    detectingLocation: "Detecting location..."
+  },
+  hi: {
+    home: "होम",
+    childInfo: "बच्चे की जानकारी",
+    chat: "चैट",
+    history: "इतिहास",
+    cgm: "सीजीएम",
+    signOut: "साइन आउट",
+    milestoneAssessment: "माइलस्टोन आकलन",
+    signInAs: "साइन इन किया गया",
+    loading: "माइलस्टोन आकलन लोड हो रहा है...",
+    childName: "बच्चे का नाम",
+    age: "उम्र",
+    personalizedRecommendations: "व्यक्तिगत विकास सिफारिशें",
+    concern: "चिंता",
+    takeAssessmentAgain: "फिर से आकलन करें",
+    noPastResponses: "इस बच्चे के लिए कोई पिछली माइलस्टोन प्रतिक्रियाएं उपलब्ध नहीं हैं।",
+    session: "सत्र",
+    answerNewQuestions: "नए प्रश्नों का उत्तर दें",
+    previous: "पिछला",
+    next: "अगला",
+    question: "प्रश्न",
+    of: "का",
+    complete: "पूर्ण",
+    yes: "हाँ",
+    no: "नहीं",
+    dontKnow: "पता नहीं",
+    getDevelopmentReport: "विकास रिपोर्ट प्राप्त करें",
+    detectingLocation: "स्थान का पता लगाया जा रहा है..."
+  },
+    kn: {
+    home: "ಮುಖಪುಟ",
+    childInfo: "ಮಗುವಿನ ಮಾಹಿತಿ",
+    chat: "ಚಾಟ್",
+    history: "ಇತಿಹಾಸ",
+    cgm: "ಶರೀರಾಂಶ",
+    signOut: "ಸೈನ್ ಔಟ್",
+    milestoneAssessment: "ಮೈಲಿಗಲ್ಲು ಮೌಲ್ಯಮಾಪನ",
+    signInAs: "ನಿಮ್ಮ ಖಾತೆ:",
+    loading: "ಮೈಲಿಗಲ್ಲು ಮೌಲ್ಯಮಾಪನ ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    childName: "ಮಗುವಿನ ಹೆಸರು",
+    age: "ವಯಸ್ಸು",
+    personalizedRecommendations: "ವೈಯಕ್ತಿಕಗೊಳಿಸಿದ ಅಭಿವೃದ್ಧಿ ಶಿಫಾರಸುಗಳು",
+    concern: "ಚಿಂತೆ",
+    takeAssessmentAgain: "ಮತ್ತೆ ಮೌಲ್ಯಮಾಪನ ಮಾಡಿ",
+    noPastResponses: "ಈ ಮಗುವಿಗೆ ಹಿಂದಿನ ಮೈಲಿಗಲ್ಲು ಪ್ರತಿಕ್ರಿಯೆಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+    session: "ಅಧಿವೇಶನ",
+    answerNewQuestions: "ಹೊಸ ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿ",
+    previous: "ಹಿಂದಿನ",
+    next: "ಮುಂದಿನ",
+    question: "ಪ್ರಶ್ನೆ",
+    of: "ನಲ್ಲಿ",
+    complete: "ಪೂರ್ಣಗೊಂಡಿದೆ",
+    yes: "ಹೌದು",
+    no: "ಇಲ್ಲ",
+    dontKnow: "ಗೊತ್ತಿಲ್ಲ",
+    getDevelopmentReport: "ಅಭಿವೃದ್ಧಿ ವರದಿ ಪಡೆಯಿರಿ",
+    detectingLocation: "ಸ್ಥಳವನ್ನು ಪತ್ತೆ ಮಾಡಲಾಗುತ್ತಿದೆ..."
+  }
+};
+
 function MilestoneAssessment() {
   const [milestones, setMilestones] = useState([]);
   const [responses, setResponses] = useState({});
@@ -17,22 +105,25 @@ function MilestoneAssessment() {
   const [concern, setConcern] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [showHistory, setShowHistory] = useState(false); // State to control history view
-
-  // Pagination states for history
+  const [showHistory, setShowHistory] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const sessionsPerPage = 6; // Number of sessions to display per page
-
+  const sessionsPerPage = 6;
   const [childInfo, setChildInfo] = useState(JSON.parse(localStorage.getItem("childInfo")));
   const [parentName, setParentName] = useState(localStorage.getItem("parentName") || null);
   const [childList, setChildList] = useState(JSON.parse(localStorage.getItem("childList")) || []);
-
   const [region, setRegion] = useState("");
   const [country, setCountry] = useState("");
+  const [language, setLanguage] = useState("en");
 
   const navigate = useNavigate();
+  const t = translations[language] || translations.en;
 
   useEffect(() => {
+    const navState = window.history.state;
+    if (navState && navState.usr && navState.usr.lang) {
+      setLanguage(navState.usr.lang);
+    }
+
     axios.get("http://localhost:5000/api/userinfo")
       .then(res => {
         setRegion(res.data.region);
@@ -69,6 +160,7 @@ function MilestoneAssessment() {
         age: childInfo.age,
         phone: childInfo.phone,
         childid: childInfo.id,
+        language: language
       }),
     })
       .then((res) => res.json())
@@ -120,8 +212,8 @@ function MilestoneAssessment() {
       setConcern(null);
       setCurrentIndex(0);
       setIsLoading(true);
-      setShowHistory(false); // Hide history when switching child
-      setCurrentPage(1); // Reset pagination when switching child
+      setShowHistory(false);
+      setCurrentPage(1);
     }
   };
 
@@ -141,6 +233,7 @@ function MilestoneAssessment() {
         phone: childInfo.phone,
         childid: childInfo.id,
         answers: answerList,
+        language: language
       }),
     })
       .then((res) => res.json())
@@ -148,7 +241,6 @@ function MilestoneAssessment() {
         if (data.recommendation) {
           setRecommendation(data.recommendation);
           setConcern(data.concern);
-          // After submission, re-fetch past responses to include the new one
           fetch("http://localhost:5000/milestone/get_milestone_responses", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -171,16 +263,15 @@ function MilestoneAssessment() {
   const renderNavbar = () => (
     <div className="navbar">
       <ul>
-        <li onClick={() => navigate("/")} className="nav-item"><IoMdHome size={35} />Home</li>
-        <li onClick={() => navigate("/child-info")} className="nav-item"><PiBabyBold size={35} />Child Info</li>
-        <li onClick={() => navigate("/chatbot")} className="nav-item"><IoChatbubbleEllipsesSharp size={35} />Chat</li>
-        {/* History button */}
+        <li onClick={() => navigate("/",{ state: { lang: language } })} className="nav-item"><IoMdHome size={35} />{t.home}</li>
+        <li onClick={() => navigate("/child-info",{ state: { lang: language } })} className="nav-item"><PiBabyBold size={35} />{t.childInfo}</li>
+        <li onClick={() => navigate("/chatbot",{ state: { lang: language } })} className="nav-item"><IoChatbubbleEllipsesSharp size={35} />{t.chat}</li>
         <li onClick={() => setShowHistory(true)} className="nav-item">
-          <span style={{ fontSize: "1.5em", marginRight: "5px" }}>&#x1F551;</span>History
+          <span style={{ fontSize: "1.5em", marginRight: "5px" }}>&#x1F551;</span>{t.history}
         </li>
-        <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="nav-item"><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
-        <li onClick={() => navigate("/signin", { state: { lang: "en" } })} className="nav-item" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <LogOut size={35} />Sign Out
+        <li onClick={() => navigate("/bmicheck",{ state: { lang: language } })} style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="nav-item"><span style={{ fontSize: "1.5em" }}>📏</span>{t.cgm}</li>
+        <li onClick={() => navigate("/signin", { state: { lang: language } })} className="nav-item" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+          <LogOut size={35} />{t.signOut}
         </li>
       </ul>
     </div>
@@ -200,14 +291,14 @@ function MilestoneAssessment() {
           <span className="curve-app-title">Shishu Vriddhi</span>
         </div>
         <div className="curve-middle-section">
-          <span className="curve-text5">MILESTONE ASSESSMENT</span>
+          <span className="curve-text5">{t.milestoneAssessment}</span>
         </div>
         <div className="curve-right-section">
           {parentName && (
             <div className="parent-header-info">
-              Sign in as <strong>{parentName}</strong>
+              {t.signInAs} <strong>{parentName}</strong>
               <div>
-                <span>{region ? `${region}, ${country}` : 'Detecting location...'}</span>
+                <span>{region ? `${region}, ${country}` : t.detectingLocation}</span>
               </div>
             </div>
           )}
@@ -224,7 +315,7 @@ function MilestoneAssessment() {
           <CurveHeader />
           <div className="loading-container">
             <div className="loading-spinner"></div>
-            <p>Loading milestone assessment...</p>
+            <p>{t.loading}</p>
           </div>
         </div>
       </div>
@@ -239,16 +330,16 @@ function MilestoneAssessment() {
           <CurveHeader />
           <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-              <span><strong>Child Name:</strong> {childInfo.name}</span>
-              <span><strong>Age:</strong> {childInfo.age}</span>
+              <span><strong>{t.childName}:</strong> {childInfo.name}</span>
+              <span><strong>{t.age}:</strong> {childInfo.age}</span>
             </div>
           </div>
           <div className="recommendation-container">
-            <h3>Personalized Development Recommendations</h3>
+            <h3>{t.personalizedRecommendations}</h3>
             <div className="recommendation-content">
               <p>{recommendation}</p>
               {concern && (
-                <p><br /><strong>Concern:</strong> {concern}</p>
+                <p><br /><strong>{t.concern}:</strong> {concern}</p>
               )}
             </div>
             <div className="action-buttons2">
@@ -262,7 +353,7 @@ function MilestoneAssessment() {
                 }}
               >
                 <ArrowLeft size={20} />
-                Take Assessment Again
+                {t.takeAssessmentAgain}
               </button>
             </div>
           </div>
@@ -275,22 +366,18 @@ function MilestoneAssessment() {
     const groupedSessions = [];
     const flatList = [];
 
-    // Flatten and sort the past responses by timestamp
     for (let [question, entries] of Object.entries(pastResponses)) {
       entries.forEach(({ answer, timestamp }) => {
         flatList.push({ question, answer, timestamp });
       });
     }
 
-    // Sort by timestamp in descending order (most recent first)
     flatList.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    // Group into sessions of 5 questions each
-    for (let i = 0; i < flatList.length; i += 5) { // Assuming each "session" is 5 questions as per your original grouping
+    for (let i = 0; i < flatList.length; i += 5) {
       groupedSessions.push(flatList.slice(i, i + 5));
     }
 
-    // Pagination logic
     const indexOfLastSession = currentPage * sessionsPerPage;
     const indexOfFirstSession = indexOfLastSession - sessionsPerPage;
     const currentSessions = groupedSessions.slice(indexOfFirstSession, indexOfLastSession);
@@ -306,8 +393,8 @@ function MilestoneAssessment() {
           <CurveHeader />
           <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-              <span><strong>Child Name:</strong> {childInfo.name}</span>
-              <span><strong>Age:</strong> {childInfo.age}</span>
+              <span><strong>{t.childName}:</strong> {childInfo.name}</span>
+              <span><strong>{t.age}:</strong> {childInfo.age}</span>
             </div>
             {childList.length > 0 && (
               <select
@@ -325,15 +412,14 @@ function MilestoneAssessment() {
           </div>
           <h2 style={{ marginTop: "20px" }}></h2>
           {groupedSessions.length === 0 ? (
-            <p>No past milestone responses available for this child.</p>
+            <p>{t.noPastResponses}</p>
           ) : (
             <>
               <div className="accordion-container">
                 {currentSessions.map((session, idx) => (
-                  // Use a unique key based on the session and its timestamp
                   <details key={`${idx}-${session[0]?.timestamp}`} className="accordion-item">
                     <summary>
-                      Session #{groupedSessions.length - (indexOfFirstSession + idx)} –{" "} {/* Adjust session numbering for pagination */}
+                      {t.session} #{groupedSessions.length - (indexOfFirstSession + idx)} –{" "}
                       {session[0]?.timestamp ? new Date(session[0].timestamp).toISOString().split('T')[0] : "N/A"}
                     </summary>
                     <ul>
@@ -347,14 +433,13 @@ function MilestoneAssessment() {
                   </details>
                 ))}
               </div>
-              {/* Pagination Controls */}
               <div className="pagination-controls">
                 <button
                   onClick={() => paginate(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="pagination-button"
                 >
-                  Previous
+                  {t.previous}
                 </button>
                 {[...Array(totalPages)].map((_, i) => (
                   <button
@@ -370,14 +455,14 @@ function MilestoneAssessment() {
                   disabled={currentPage === totalPages}
                   className="pagination-button"
                 >
-                  Next
+                  {t.next}
                 </button>
               </div>
             </>
           )}
           <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
             <button className="back-button" onClick={() => setShowHistory(false)}>
-              <ArrowLeft size={20} /> Answer New Questions
+              <ArrowLeft size={20} /> {t.answerNewQuestions}
             </button>
           </div>
         </div>
@@ -396,8 +481,8 @@ function MilestoneAssessment() {
         {childInfo && (
           <div className="fixed-child-info2" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-              <span><strong>Child Name:</strong> {childInfo.name}</span>
-              <span><strong>Age:</strong> {childInfo.age}</span>
+              <span><strong>{t.childName}:</strong> {childInfo.name}</span>
+              <span><strong>{t.age}:</strong> {childInfo.age}</span>
             </div>
             {childList.length > 0 && (
               <select
@@ -417,8 +502,8 @@ function MilestoneAssessment() {
         <div className="assessment-content">
           <div className="progress-section">
             <div className="progress-info">
-              <span>Question {currentIndex + 1} of {milestones.length}</span>
-              <span>{Math.round(progress)}% Complete</span>
+              <span>{t.question} {currentIndex + 1} {t.of} {milestones.length}</span>
+              <span>{Math.round(progress)}% {t.complete}</span>
             </div>
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress}%` }}></div>
@@ -442,10 +527,10 @@ function MilestoneAssessment() {
                     onClick={() => handleSelect(currentQuestion, option)}
                   >
                     {option === "Yes"
-                      ? "Yes"
+                      ? t.yes
                       : option === "No"
-                        ? "No"
-                        : "Don't know"}
+                        ? t.no
+                        : t.dontKnow}
                   </button>
                 ))}
               </div>
@@ -456,7 +541,7 @@ function MilestoneAssessment() {
                   onClick={() => setCurrentIndex((prev) => Math.max(prev - 1, 0))}
                   disabled={currentIndex === 0}
                 >
-                  Previous
+                  {t.previous}
                 </button>
                 {currentIndex < milestones.length - 1 && (
                   <button
@@ -467,7 +552,7 @@ function MilestoneAssessment() {
                     }
                     disabled={!responses[currentQuestion]}
                   >
-                    Next
+                    {t.next}
                   </button>
                 )}
               </div>
@@ -476,7 +561,7 @@ function MilestoneAssessment() {
                 <div className="submit-section">
                   <button className="submit-btn" onClick={handleSubmit}>
                     <Award size={20} />
-                    Get Development Report
+                    {t.getDevelopmentReport}
                   </button>
                 </div>
               )}

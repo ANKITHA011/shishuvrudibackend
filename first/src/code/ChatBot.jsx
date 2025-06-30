@@ -1,14 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import jsPDF from 'jspdf';
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Volume2, Mic, LogOut, ArrowDownCircle, FileText, Code, History, Home, Baby } from "lucide-react";
-// import './chat.css'; // This CSS file needs to be handled externally or styles moved inline/to Tailwind
-
-// For jsPDF, assume it's loaded via CDN in the HTML environment
-// You will need to add <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-// to your HTML file where this React app is mounted.
-
 import axios from 'axios';
+import { IoMdHome } from "react-icons/io";
+import translations from "./translations4";
+import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 
 // Helper function to format timestamp
 const formatTimestamp = (dateString) => {
@@ -22,7 +20,7 @@ const formatTimestamp = (dateString) => {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-const CurveHeader = ({ childInfo, parentName, region, country }) => (
+const CurveHeader = ({ childInfo, parentName, region, country, t }) => (
     <div className="curve-separator5">
         <svg viewBox="0 0 500 80" preserveAspectRatio="none">
             <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
@@ -31,17 +29,17 @@ const CurveHeader = ({ childInfo, parentName, region, country }) => (
         <div className="curve-content5">
             <div className="curve-left-section">
                 <div className="curve-icon5">
-                    <img src="/baby-icon.png" alt="Baby Icon" /> {/* Ensure this image path is correct */}
+                    <img src="/baby-icon.png" alt="Baby Icon" />
                 </div>
                 <span className="curve-app-title">Shishu Vriddhi</span>
             </div>
             <div className="curve-middle-section">
-                <span className="curve-text5">CHAT WITH ME</span>
+                <span className="curve-text5">{t.chatTitle}</span>
             </div>
             <div className="curve-right-section">
                 {childInfo && (
                     <div className="curve-right-section">
-                        <div className="child-info-line">Sign in as {parentName || "Loading..."}</div>
+                        <div className="child-info-line">{t.signedInAs} {parentName || t.loading}</div>
                         <span>{region}, {country}</span>
                     </div>
                 )}
@@ -52,12 +50,16 @@ const CurveHeader = ({ childInfo, parentName, region, country }) => (
 
 // Map download options to Lucide React icons
 const downloadOptionIcons = {
-    'Download PDF': FileText, // Using FileText for PDF
-    'Download TXT': FileText, // Using FileText for TXT
-    'Download JSON': Code,    // Using Code for JSON
+    'Download PDF': FileText,
+    'Download TXT': FileText,
+    'Download JSON': Code,
 };
 
 function ChatBot() {
+    const location = useLocation();
+    const selectedLang = location.state?.lang || "en";
+    const t = translations[selectedLang] || translations["en"];
+    
     const [childInfo, setChildInfo] = useState(null);
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState([]);
@@ -69,14 +71,13 @@ function ChatBot() {
     const [showDownloadOptions, setShowDownloadOptions] = useState(false);
     const [parentName, setParentName] = useState(localStorage.getItem("parentName") || null);
     const [childList, setChildList] = useState(JSON.parse(localStorage.getItem("childList")) || []);
-    const [userRegion, setUserRegion] = useState("Loading region...");
-    const [userCountry, setUserCountry] = useState("Loading country...");
+    const [userRegion, setUserRegion] = useState(t.loadingRegion);
+    const [userCountry, setUserCountry] = useState(t.loadingCountry);
     const [showDoctorListDialog, setShowDoctorListDialog] = useState(false);
     const [doctors, setDoctors] = useState([]);
-    const [availabilityMap, setAvailabilityMap] = useState({}); // State for doctor availability
-    const [availabilityIntervalId, setAvailabilityIntervalId] = useState(null); // To store interval ID for polling
+    const [availabilityMap, setAvailabilityMap] = useState({});
+    const [availabilityIntervalId, setAvailabilityIntervalId] = useState(null);
     
-    // NEW STATES FOR WHISPER INTEGRATION
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
@@ -128,7 +129,6 @@ function ChatBot() {
         }
     }, [messages]);
 
-    // Effect to show/hide the dialog using the ref
     useEffect(() => {
         if (showDoctorListDialog) {
             doctorDialogRef.current?.showModal();
@@ -137,33 +137,27 @@ function ChatBot() {
         }
     }, [showDoctorListDialog]);
 
-    // NEW: Effect to manage polling for doctor availability
     useEffect(() => {
         if (showDoctorListDialog && doctors.length > 0) {
-            // Clear any existing interval to prevent duplicates
             if (availabilityIntervalId) {
                 clearInterval(availabilityIntervalId);
             }
 
-            // Fetch immediately and then every 5 seconds
-            fetchAvailabilityForDoctors(doctors); // Initial fetch
+            fetchAvailabilityForDoctors(doctors);
             const interval = setInterval(() => {
                 fetchAvailabilityForDoctors(doctors);
-            }, 5000); // Poll every 5 seconds (adjust as needed)
+            }, 5000);
             setAvailabilityIntervalId(interval);
 
-            // Cleanup function to clear the interval when the dialog is closed or component unmounts
             return () => {
                 clearInterval(interval);
                 setAvailabilityIntervalId(null);
             };
         } else if (!showDoctorListDialog && availabilityIntervalId) {
-            // Clear interval if dialog is closed
             clearInterval(availabilityIntervalId);
             setAvailabilityIntervalId(null);
         }
-    }, [showDoctorListDialog, doctors]); // Add doctors to dependency array so it re-runs if doctors list changes
-
+    }, [showDoctorListDialog, doctors]);
 
     const fetchUserInfo = async () => {
         try {
@@ -172,8 +166,8 @@ function ChatBot() {
             setUserCountry(response.data.country);
         } catch (error) {
             console.error("Error fetching user info:", error);
-            setUserRegion("Unknown Region");
-            setUserCountry("Unknown Country");
+            setUserRegion(t.unknownRegion);
+            setUserCountry(t.unknownCountry);
         }
     };
 
@@ -181,7 +175,7 @@ function ChatBot() {
         try {
             const availabilityResults = await Promise.all(
                 doctorsList.map(async (doc) => {
-                    const res = await axios.get(`http://localhost:5000/chatbot/doctor/availability/${doc.doctor_id}`);
+                    const res = await axios.get(`http://localhost:5000/chatbot/doctor/availabilit/${doc.phone_number}`);
                     return { doctor_id: doc.doctor_id, available: res.data.available };
                 })
             );
@@ -191,14 +185,12 @@ function ChatBot() {
                 newAvailabilityMap[doctor_id] = available;
             });
 
-            // Merge new availability with existing map to maintain previous states for other doctors
             setAvailabilityMap(prevMap => ({ ...prevMap, ...newAvailabilityMap }));
         } catch (error) {
             console.error("Failed to fetch doctors availability", error);
-            // Optionally, set doctors to offline if fetching fails
             const failedAvailability = {};
             doctorsList.forEach(doc => {
-                failedAvailability[doc.doctor_id] = false; // Assume offline on error
+                failedAvailability[doc.doctor_id] = false;
             });
             setAvailabilityMap(prevMap => ({ ...prevMap, ...failedAvailability }));
         }
@@ -229,7 +221,8 @@ function ChatBot() {
                     age: childInfo.age,
                     phone: childInfo.phone,
                     gender: childInfo.gender,
-                    childid: childInfo.id
+                    childid: childInfo.id,
+                    language: selectedLang
                 }),
             });
 
@@ -237,14 +230,14 @@ function ChatBot() {
 
             if (data.preview) {
                 setMessages([{
-                    sender: "Expert",
-                    text: `Welcome back! Here's a quick summary of your previous conversation: "${data.preview}"`,
+                    sender: t.expert,
+                    text: `${t.welcomeBack} "${data.preview}"`,
                     timestamp: formatTimestamp(new Date())
                 }]);
             } else {
                 setMessages([{
-                    sender: "Expert",
-                    text: `Hello! Welcome to Shishu Vriddhi. I'm here to help you with questions about ${childInfo.name}'s development. As a ${childInfo.age}-month-old ${childInfo.gender}, there are many exciting milestones ahead.`,
+                    sender: t.expert,
+                    text: `${t.welcomeMessage} ${childInfo.name}'s ${t.development}. ${t.ageGenderMessage(childInfo.age, childInfo.gender)}`,
                     timestamp: formatTimestamp(new Date())
                 }]);
             }
@@ -253,8 +246,8 @@ function ChatBot() {
         } catch (error) {
             console.error("Failed to initialize chat:", error);
             setMessages([{
-                sender: "Expert",
-                text: "Hello! Welcome to Shishu Vriddhi. I'm here to help you with questions about your child's development. How can I assist you today?",
+                sender: t.expert,
+                text: t.defaultWelcomeMessage,
                 timestamp: formatTimestamp(new Date())
             }]);
             setInitialMessageSet(true);
@@ -274,7 +267,8 @@ function ChatBot() {
                     age: childInfo.age,
                     phone: childInfo.phone,
                     gender: childInfo.gender,
-                    childid: childInfo.id
+                    childid: childInfo.id,
+                    language: selectedLang
                 }),
             });
 
@@ -282,7 +276,7 @@ function ChatBot() {
 
             if (Array.isArray(data.history) && data.history.length > 0) {
                 const loaded = data.history.map(msg => ({
-                    sender: msg.chatrole === 'user' ? 'Parent' : 'Expert',
+                    sender: msg.chatrole === 'user' ? t.parent : t.expert,
                     text: msg.content,
                     timestamp: formatTimestamp(msg.createddate),
                     audio: msg.audio
@@ -290,8 +284,8 @@ function ChatBot() {
                 setMessages(loaded);
             } else {
                 setMessages([{
-                    sender: "Expert",
-                    text: "There is no previous chat history available for this child.",
+                    sender: t.expert,
+                    text: t.noHistory,
                     timestamp: formatTimestamp(new Date())
                 }]);
             }
@@ -301,8 +295,8 @@ function ChatBot() {
         } catch (error) {
             console.error("Failed to load history:", error);
             setMessages([{
-                sender: "Expert",
-                text: "⚠️ Failed to load chat history. Please try again later.",
+                sender: t.expert,
+                text: t.historyError,
                 timestamp: formatTimestamp(new Date())
             }]);
         }
@@ -320,7 +314,7 @@ function ChatBot() {
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = 1;
         utter.pitch = 1;
-        utter.lang = 'en-US';
+        utter.lang = selectedLang === 'hi' ? 'hi-IN' : 'en-US';
 
         utteranceRef.current = utter;
         setIsSpeaking(true);
@@ -330,9 +324,9 @@ function ChatBot() {
 
         synth.speak(utter);
     };
-    // NEW: Function to start recording audio
+
     const startRecording = async () => {
-        if (isSpeaking) { // Stop any ongoing speech before recording
+        if (isSpeaking) {
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
         }
@@ -344,13 +338,12 @@ function ChatBot() {
                 audioChunks.current.push(event.data);
             };
             mediaRecorder.current.onstop = async () => {
-                const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' }); // Use webm for broader compatibility
+                const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
                 console.log("Audio recorded:", audioBlob);
-                // Send to backend for Whisper transcription
                 setLoading(true);
                 try {
                     const formData = new FormData();
-                    formData.append('audio', audioBlob, 'recording.webm'); // Ensure correct filename and type
+                    formData.append('audio', audioBlob, 'recording.webm');
                     const response = await axios.post("http://localhost:5000/chatbot/speech-to-text", formData, {
                         headers: {
                             'Content-Type': 'multipart/form-data',
@@ -358,15 +351,13 @@ function ChatBot() {
                     });
                     const transcribedText = response.data.text;
                     if (transcribedText) {
-                        setInput(transcribedText); // Set the transcribed text into the input field
-                        // Optionally, auto-send the message if you want
-                        // handleSend(transcribedText);
+                        setInput(transcribedText);
                     } else {
-                        addBotMessage("Could not transcribe audio. Please try again.", []);
+                        addBotMessage(t.transcriptionError, []);
                     }
                 } catch (error) {
                     console.error("Error sending audio to Whisper backend:", error);
-                    addBotMessage("Error processing speech. Please try typing your message.", []);
+                    addBotMessage(t.audioProcessingError, []);
                 } finally {
                     setLoading(false);
                 }
@@ -376,10 +367,10 @@ function ChatBot() {
             console.log("Recording started...");
         } catch (error) {
             console.error("Error accessing microphone:", error);
-            addBotMessage("Microphone access denied or an error occurred. Please ensure microphone permissions are granted.", []);
+            addBotMessage(t.microphoneError, []);
         }
     };
-    // NEW: Function to stop recording audio
+
     const stopRecording = () => {
         if (mediaRecorder.current && isRecording) {
             mediaRecorder.current.stop();
@@ -387,6 +378,7 @@ function ChatBot() {
             console.log("Recording stopped.");
         }
     };
+
     const handleMicButtonClick = () => {
         if (isRecording) {
             stopRecording();
@@ -394,11 +386,12 @@ function ChatBot() {
             startRecording();
         }
     };
+
     const handleSend = async (messageToSend = input) => {
         if (!messageToSend.trim() || !childInfo) return;
 
         const newUserMsg = {
-            sender: "Parent",
+            sender: t.parent,
             text: messageToSend,
             timestamp: formatTimestamp(new Date())
         };
@@ -436,13 +429,14 @@ function ChatBot() {
                     gender: childInfo.gender,
                     name: childInfo.name,
                     phone: childInfo.phone,
-                    childid: childInfo.id
+                    childid: childInfo.id,
+                    language: selectedLang
                 }),
             });
 
             const data = await res.json();
             const botReply = {
-                sender: "Expert",
+                sender: t.expert,
                 text: data.response || data.error,
                 timestamp: formatTimestamp(data.timestamp || new Date()),
                 audio: data.audio
@@ -456,8 +450,8 @@ function ChatBot() {
             }
         } catch (error) {
             setMessages(prev => [...prev, {
-                sender: "Expert",
-                text: "⚠️ Error fetching response.",
+                sender: t.expert,
+                text: t.responseError,
                 timestamp: formatTimestamp(new Date())
             }]);
         } finally {
@@ -472,30 +466,17 @@ function ChatBot() {
         console.log("Attempting to download in format:", format);
         const textContent = messages.map(m => `${m.sender}: ${m.text} (${m.timestamp})`).join('\n');
 
-        if (!jsPDF) {
-            addBotMessage("PDF download is not available. Please ensure jsPDF library is loaded correctly.", []);
-            console.error("jsPDF is not loaded.");
-            return;
-        }
-
-        if (!textContent && format !== 'pdf') {
-            console.warn("No chat messages to download.");
-            addBotMessage("There are no messages in the chat to download.", []);
-            return;
-        }
-
         if (format === 'pdf') {
             try {
                 const doc = new jsPDF();
                 doc.setFontSize(12);
-                const lines = doc.splitTextToSize(textContent || "No chat history available.", 180);
+                const lines = doc.splitTextToSize(textContent || t.noChatHistory, 180);
                 doc.text(lines, 10, 10);
                 doc.save("chat_history.pdf");
-                console.log("PDF download initiated successfully by jsPDF.");
-                addBotMessage("Your chat history has been downloaded as a PDF.", []);
+                addBotMessage(t.pdfDownloadSuccess, []);
             } catch (error) {
                 console.error("Error generating PDF:", error);
-                addBotMessage("Failed to generate PDF. Please try again later.", []);
+                addBotMessage(t.pdfDownloadError, []);
             }
             return;
         }
@@ -508,7 +489,7 @@ function ChatBot() {
             contentToDownload = JSON.stringify(messages, null, 2);
             mimeType = 'application/json';
             filename = "chat_history.json";
-        } else { // 'txt'
+        } else {
             contentToDownload = textContent;
             mimeType = 'text/plain';
             filename = "chat_history.txt";
@@ -524,86 +505,32 @@ function ChatBot() {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
 
-        console.log(`${format.toUpperCase()} download initiated for: ${filename}`);
-        addBotMessage(`Your chat history has been downloaded as a ${format.toUpperCase()} file.`, []);
+        addBotMessage(t.downloadSuccess(format.toUpperCase()), []);
     };
 
     const handleDownloadClick = () => {
-        if (!showDownloadOptions) {
-            setShowDownloadOptions(true);
-            setMessages(prev => [...prev, {
-                sender: "Expert",
-                text: "In which format would you like to download the chat?",
-                options: ['Download PDF', 'Download TXT', 'Download JSON'],
-                timestamp: formatTimestamp(new Date())
-            }]);
-        }
-    };
+    setShowDownloadOptions(true);
+    setMessages(prev => [...prev, {
+        sender: t.expert,
+        text: t.downloadPrompt,
+        options: [
+            { text: t.downloadPDF, format: 'pdf' },
+            { text: t.downloadTXT, format: 'txt' },
+            { text: t.downloadJSON, format: 'json' }
+        ],
+        timestamp: formatTimestamp(new Date())
+    }]);
+};
 
-    const handleDownloadOptionSelect = (option) => {
-        console.log("Selected download option:", option);
-        const format = option.split(' ')[1].toLowerCase();
-        console.log("Derived format for download:", format);
-        downloadChat(format);
-        setShowDownloadOptions(false);
-    };
-
-    const handleHeightWeightCheck = async () => {
-        const height = prompt("Enter your child's height in cm:");
-        const weight = prompt("Enter your child's weight in kg:");
-
-        if (!height || !weight) return;
-
-        try {
-            const res = await fetch("http://localhost:5000/chatbot/child_assessment", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    name: childInfo.name,
-                    age: childInfo.age,
-                    gender: childInfo.gender,
-                    height: parseFloat(height),
-                    weight: parseFloat(weight)
-                })
-            });
-
-            const data = await res.json();
-
-            if (data.recommendation) {
-                setMessages(prev => [
-                    ...prev,
-                    {
-                        sender: "Expert",
-                        text: `📏 Assessment:\n• Height is ${data.height_status} the ideal range.\n• Weight is ${data.weight_status} the ideal range.\n\n📝 ${data.recommendation}`,
-                        timestamp: formatTimestamp(new Date())
-                    }
-                ]);
-            } else {
-                setMessages(prev => [
-                    ...prev,
-                    {
-                        sender: "Expert",
-                        text: `⚠️ ${data.error || "Unable to generate assessment. Please check the values and try again."}`,
-                        timestamp: formatTimestamp(new Date())
-                    }
-                ]);
-            }
-        } catch (error) {
-            console.error(error);
-            setMessages(prev => [
-                ...prev,
-                {
-                    sender: "Expert",
-                    text: "⚠️ Something went wrong with the height/weight check.",
-                    timestamp: formatTimestamp(new Date())
-                }
-            ]);
-        }
-    };
+const handleDownloadOptionSelect = (option) => {
+    console.log("Selected option:", option); // Debug log
+    downloadChat(option.format);
+    setShowDownloadOptions(false);
+};
 
     const addBotMessage = (text, options = []) => {
         const newMessage = {
-            sender: 'Expert',
+            sender: t.expert,
             text,
             options,
             timestamp: formatTimestamp(new Date())
@@ -628,10 +555,9 @@ function ChatBot() {
             const res = await axios.get('http://localhost:5000/chatbot/doctors');
             setDoctors(res.data);
             setShowDoctorListDialog(true);
-            // The useEffect will now handle fetching availability immediately and then periodically
         } catch (err) {
             console.error("Error fetching doctors:", err);
-            addBotMessage("Failed to load doctor list. Please try again later.", []);
+            addBotMessage(t.doctorListError, []);
         }
     };
 
@@ -645,33 +571,57 @@ function ChatBot() {
                 doctor_id: doctorPhone
             });
 
-            setShowDoctorListDialog(false); // Close the dialog
-            navigate('/doctorchat', { state: { doctor, childInfo } }); // Navigate to doctor chat screen
+            setShowDoctorListDialog(false);
+            navigate('/doctorchat', { state: { doctor, childInfo, lang: selectedLang } });
         } catch (error) {
             console.error("Error starting chat or inserting notification:", error);
-            addBotMessage("Error: Could not initiate chat with the doctor.", []);
+            addBotMessage(t.doctorChatError, []);
         }
     };
 
     return (
         <div className="page-layout">
-            <CurveHeader childInfo={childInfo} parentName={parentName} region={userRegion} country={userCountry} />
+            <CurveHeader 
+                childInfo={childInfo} 
+                parentName={parentName} 
+                region={userRegion} 
+                country={userCountry}
+                t={t}
+            />
 
             <div className="left-nav1">
                 <ul>
-                    <li onClick={() => navigate("/")}><Home size={35} />Home</li>
-                    <li onClick={() => navigate("/child-info")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><span style={{ fontSize: "1.5em" }}><Baby size={35} /></span>Child Info</li>
-                    <li onClick={() => navigate("/milestone")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📊</span>Milestone</li>
-                    <li onClick={() => navigate("/bmicheck")} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><span style={{ fontSize: "1.5em" }}>📏</span>CGM</li>
-                    <li onClick={loadHistory} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><History size={30} />Chat History</li>
-                    <li onClick={() => navigate("/signin", { state: { lang: 'en' } })} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}><LogOut size={30} />Sign Out</li>
+                    <li onClick={() => navigate("/", { state: { lang: selectedLang } })}>
+                        <IoMdHome size={35} />{t.home}
+                    </li>
+                    <li onClick={() => navigate("/child-info", { state: { lang: selectedLang } })} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <Baby size={35} />{t.childInfo}
+                    </li>
+                    <li onClick={() => navigate("/milestone", { state: { lang: selectedLang } })} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: "1.5em" }}>📊</span>{t.milestone}
+                    </li>
+                    <li onClick={() => navigate("/bmicheck", { state: { lang: selectedLang } })} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: "1.5em" }}>📏</span>{t.cgm}
+                    </li>
+                    <li onClick={loadHistory} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <History size={30} />{t.chatHistory}
+                    </li>
+                    <li onClick={() => navigate("/signin", { state: { lang: selectedLang } })} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <LogOut size={30} />{t.signOut}
+                    </li>
                 </ul>
             </div>
+
             {childInfo && (
                 <div className="fixed-child-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-                        <span><strong>Child Name:</strong> {childInfo.name}</span>
-                        <span><strong>Age:</strong> {childInfo.age}</span>
+                        <span><strong>{t.childName}:</strong> {childInfo.name}</span>
+                        <span><strong>{t.age}:</strong> {childInfo.age}</span>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -702,10 +652,10 @@ function ChatBot() {
                                 alignItems: 'center',
                                 gap: '6px'
                             }}
-                            title="Download Chat"
+                            title={t.downloadChat}
                         >
                             <ArrowDownCircle size={18} />
-                            Download Chat
+                            {t.downloadChat}
                         </button>
                         {childInfo && (
                             <div style={{ textAlign: 'center', margin: '20px' }}>
@@ -720,7 +670,7 @@ function ChatBot() {
                                     }}
                                     onClick={handleChatWithPediatricianClick}
                                 >
-                                    👨‍⚕️ Chat with Pediatrician
+                                    👨‍⚕️ {t.chatWithPediatrician}
                                 </button>
                             </div>
                         )}
@@ -732,12 +682,12 @@ function ChatBot() {
                 <div className="chat-window1" ref={chatWindowRef}>
                     {messages.map((msg, i) => (
                         <div key={i}>
-                            <div className={msg.sender === 'Parent' ? 'user-msg' : 'bot-msg'}>
-                                <div className="avatar2">{msg.sender === 'Parent' ? '👩‍👧' : '🧑‍⚕️'}</div>
+                            <div className={msg.sender === t.parent ? 'user-msg' : 'bot-msg'}>
+                                <div className="avatar2">{msg.sender === t.parent ? '👩‍👧' : '🧑‍⚕️'}</div>
                                 <div className="message">
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <strong>{msg.sender}</strong>
-                                        <button className="speak-btn" onClick={() => handleSpeak(msg.text)} title="Speak">
+                                        <button className="speak-btn" onClick={() => handleSpeak(msg.text)} title={t.speak}>
                                             <Volume2 color={isSpeaking ? 'black' : 'black'} />
                                         </button>
                                     </div>
@@ -746,28 +696,28 @@ function ChatBot() {
                                 </div>
                             </div>
                             {msg.options?.length > 0 && (
-                                <div className="options-buttons">
-                                    {msg.options.map((opt, idx) => {
-                                        const IconComponent = downloadOptionIcons[opt];
-                                        return (
-                                            <button
-                                                key={idx}
-                                                onClick={() => handleDownloadOptionSelect(opt)}
-                                                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                                            >
-                                                {IconComponent && <IconComponent size={16} />}
-                                                {opt}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
+    <div className="options-buttons">
+        {msg.options.map((opt, idx) => {
+            const IconComponent = downloadOptionIcons[opt.text];
+            return (
+                <button
+                    key={idx}
+                    onClick={() => handleDownloadOptionSelect(opt)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                    {IconComponent && <IconComponent size={16} />}
+                    {opt.text}
+                </button>
+            );
+        })}
+    </div>
+)}
                         </div>
                     ))}
-                    {loading && <div className="typing">🧑‍⚕️ Typing...</div>}
+                    {loading && <div className="typing">🧑‍⚕️ {t.typing}...</div>}
                 </div>
 
-                             {!chatEnded ? (
+                {!chatEnded ? (
                     <div className="input-row">
                         <input
                             ref={inputRef}
@@ -779,34 +729,32 @@ function ChatBot() {
                                     handleSend();
                                 }
                             }}
-                            placeholder="Ask a question about your child..."
+                            placeholder={t.inputPlaceholder}
                             disabled={loading || isRecording}
                         />
 
-                        {/* Updated Mic Button */}
                         <button
                             onClick={handleMicButtonClick}
-                            title={isRecording ? "Stop Recording" : "Start Recording"}
+                            title={isRecording ? t.stopRecording : t.startRecording}
                             className="mic-button"
                             disabled={loading}
-                            style={{ backgroundColor: isRecording ? 'red' : 'transparent' }} // Visual feedback for recording
+                            style={{ backgroundColor: isRecording ? 'red' : 'transparent' }}
                         >
                             <Mic color={isRecording ? 'white' : 'black'} />
                         </button>
 
-                        <button onClick={handleSend} disabled={loading || !input.trim()}>Send</button>
+                        <button onClick={handleSend} disabled={loading || !input.trim()}>{t.send}</button>
                     </div>
                 ) : (
                     <div className="end-chat">
-                        <p>Chat ended. You can restart a new session from the dashboard.</p>
+                        <p>{t.chatEnded}</p>
                     </div>
                 )}
             </div>
 
             <dialog ref={doctorDialogRef} className="doctor-dialog">
                 <div className="doctor-dialog-header">
-                    <h2 className="doctor-dialog-title">Available Pediatricians</h2>
-
+                    <h2 className="doctor-dialog-title">{t.availablePediatricians}</h2>
                     <button className="close-dialog-button" onClick={() => setShowDoctorListDialog(false)}>✖</button>
                 </div>
 
@@ -815,29 +763,28 @@ function ChatBot() {
                         doctors.map((doc) => (
                             <div key={doc.doctor_id} className="doctor-card">
                                 <div className="doctor-details">
-                                    <p><strong>Name:</strong> {doc.doctor_name}</p>
-                                    <p><strong>Email:</strong> {doc.email_id}</p>
+                                    <p><strong>{t.name}:</strong> {doc.doctor_name}</p>
+                                    <p><strong>{t.email}:</strong> {doc.email_id}</p>
                                     <p>
-                                        <strong>Status: </strong>
+                                        <strong>{t.status}: </strong>
                                         <span style={{
                                             color: availabilityMap[doc.doctor_id] ? "green" : "gray",
                                             fontWeight: "bold",
                                         }}>
-                                            ● {availabilityMap[doc.doctor_id] ? "Online" : "Offline"}
+                                            ● {availabilityMap[doc.doctor_id] ? t.online : t.offline}
                                         </span>
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => handleStartDoctorChat(doc)}
                                     className="chat-button"
-                                    // Disable button if doctor is offline
                                 >
-                                    Start Chat
+                                    {t.startChat}
                                 </button>
                             </div>
                         ))
                     ) : (
-                        <p>No doctors available at the moment.</p>
+                        <p>{t.noDoctorsAvailable}</p>
                     )}
                 </div>
             </dialog>

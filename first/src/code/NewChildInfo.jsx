@@ -131,9 +131,7 @@ function NewChildInfo() {
     const tempErrors = {};
     if (!child.name.trim()) {
       tempErrors.name = currentErrors.nameRequired;
-    } else if (!/^[a-zA-Z\s]{2,50}$/.test(child.name.trim())) {
-      tempErrors.name = currentErrors.nameInvalid;
-    }
+    } 
     if (!child.date_of_birth) tempErrors.date_of_birth = currentErrors.dobRequired;
     if (!child.gender) tempErrors.gender = currentErrors.genderRequired;
 

@@ -76,6 +76,7 @@ function SignIn() {
       if (form.role === "doctor") {
         localStorage.setItem("doctorId", userid);
         localStorage.setItem("doctorName", name);
+        localStorage.setItem("selectedLang",selectedLang);
         navigate("/doctor-dashboard");
       } else {
         localStorage.setItem("userId", userid);
@@ -108,7 +109,7 @@ function SignIn() {
 
         <div className="right-section1">
           <CurveHeader />
-          <button className="back-home-button" onClick={() => navigate("/")}>
+          <button className="back-home-button" onClick={() => navigate("/",{ state: { lang: language } })}>
             <IoMdHome size={35} />
           </button>
 

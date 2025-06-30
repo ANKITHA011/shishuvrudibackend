@@ -17,8 +17,8 @@ from dateutil.relativedelta import relativedelta
 chatbot_bp = Blueprint("chatbot", __name__)
 
 # Configure Gemini API
-genai.configure(api_key="AIzaSyDO-nvH8fpcmru_FE61GpsU-nDOwaVko") # Replace with your actual API key
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
+genai.configure(api_key="AIzaSyDt7Bfz1nvkLdCK4nogYtNg3kMBDB0xRlI") # Replace with your actual API key
+model = genai.GenerativeModel("gemini-2.0-flash-lite")
 
 # Redis setup
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
@@ -339,7 +339,14 @@ def delete_child(child_id):
         if conn:
             conn.close()
 
-# --- Child Assessment Endpoints (Modified to use get_db_connection) ---
+# Assuming this is part of your Flask app's chatbot_bp blueprint file
+
+from flask import Blueprint, request, jsonify
+from deep_translator import GoogleTranslator
+import traceback
+import google.generativeai as genai
+import os
+
 
 def get_ideal_ranges(age_months, gender=None):
     # Month-specific ideal values for 0-12 months (you can fine-tune these based on real growth data)
@@ -386,6 +393,8 @@ def child_assessment():
         name = data.get("name", "the child")
         gender = data.get("gender")
         child_id = data.get("id")
+        # Extract the language from the request data. Default to 'en' (English).
+        language = data.get("language", "en") 
 
         try:
             age_months = int(data.get("age"))
@@ -446,12 +455,12 @@ def child_assessment():
         conn = get_db_connection()
         with conn.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO tblcgm (cgmchildid,cgmheightcm, cgmweightkg)
+                INSERT INTO tblcgm (cgmchildid, cgmheightcm, cgmweightkg)
                 VALUES (%s, %s, %s)
             """, (child_id, height_cm, weight_kg))
             conn.commit()
 
-        # Generate recommendation
+        # Generate recommendation using Gemini
         recommendation = ""
         if height_status != "within the ideal range" or weight_status != "within the ideal range":
             prompt_parts = [
@@ -497,6 +506,16 @@ def child_assessment():
                 f"a healthy range for a {age_months}-month-old baby. Keep up the great work with their feeding and "
                 "regular pediatric check-ups. Consistent growth is key!"
             )
+        
+        # Translate the recommendation to the desired language if it's not English
+        if language != "en":
+            try:
+                translator = GoogleTranslator(source='en', target=language)
+                recommendation = translator.translate(recommendation)
+            except Exception as translate_e:
+                print(f"Translation error: {translate_e}")
+                # If translation fails, fall back to the original English recommendation
+                pass 
 
         response = jsonify({
             "age_months": age_months,
@@ -1048,7 +1067,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Load a multilingual Whisper model
 logging.info("Loading multilingual Whisper model...")
 try:
-    whisper_model = whisper.load_model("small")  # or "medium", "large"
+    whisper_model = whisper.load_model("small")
     logging.info("Multilingual Whisper model loaded successfully.")
 except Exception as e:
     logging.error(f"Failed to load Whisper model: {e}")
@@ -1101,29 +1120,30 @@ def speech_to_text():
         logging.error(f"Error in transcription: {e}", exc_info=True)
         return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
 
-@chatbot_bp.route('/doctor/availabilitys/<string:doctor_id>', methods=['GET'])
-def get_doctor_availability2(doctor_id):
+@chatbot_bp.route('/doctor/availabilit/<doctor_id>', methods=['GET'])
+def get_doctor_availabilit(doctor_id):
     conn = None
-    cur = None
     try:
         conn = get_db_connection()
-        cur = conn.cursor()
-        # Query the database for the 'available' status
-        # In PostgreSQL, boolean is directly returned as True/False
-        cur.execute("SELECT available FROM login_sessions WHERE doctor_id = %s", (doctor_id,))
-        result = cur.fetchone()
+        with conn.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT available, last_action_time
+                FROM login_sessions
+                WHERE doctor_id = %s
+            """, (doctor_id,))
+            row = cursor.fetchone()
 
-        if result:
-            available_status = result[0] # This will be True or False directly
-            return jsonify({'doctor_id': doctor_id, 'available': available_status})
-        else:
-            # If doctor_id not found, assume offline or handle as an error
-            return jsonify({'doctor_id': doctor_id, 'available': False}), 404
+        if not row:
+            return jsonify({"available": False, "last_action_time": None}), 200
+
+        return jsonify({
+            "available": bool(row["available"]),
+            "last_action_time": row["last_action_time"].isoformat() if row["last_action_time"] else None
+        }), 200
     except Exception as e:
-        print(f"Error fetching doctor availability: {e}")
-        return jsonify({'error': 'Failed to fetch availability', 'details': str(e)}), 500
+        print(f"❌ Error fetching availability: {e}")
+        return jsonify({"available": False, "last_action_time": None}), 500
     finally:
-        if cur:
-            cur.close()
         if conn:
             conn.close()
+

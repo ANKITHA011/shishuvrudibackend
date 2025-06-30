@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Volume2, Mic, LogOut } from "lucide-react";
 import { IoMdHome } from "react-icons/io";
-import { PiBabyBold } from "react-icons/pi";
 import { io } from "socket.io-client";
+import translations from "./translations9";
 import './chat.css';
 
 const socket = io("http://localhost:5001");
@@ -11,13 +11,15 @@ const socket = io("http://localhost:5001");
 function ParentChat() {
   const { childId, parentName, doctorPhone } = useParams();
   const navigate = useNavigate();
-
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [doctorName, setDoctorName] = useState("Doctor");
   const [childInfo, setChildInfo] = useState(null);
   const chatRef = useRef(null);
+
+  const selectedLang = localStorage.getItem("selectedLang") || "en";
+  const t = translations[selectedLang] || translations.en;
 
   const roomId = `${childId}_${doctorPhone}`;
 
@@ -33,55 +35,35 @@ function ParentChat() {
   };
 
   useEffect(() => {
-    const fetchDoctorName = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/chatbot/doctor_name/${doctorPhone}`);
-        const data = await res.json();
-        if (data?.doctor_name) {
-          setDoctorName(data.doctor_name);
-        }
-      } catch (err) {
-        console.error("Failed to fetch doctor name:", err);
-      }
-    };
-    fetchDoctorName();
+    fetch(`http://localhost:5000/chatbot/doctor_name/${doctorPhone}`)
+      .then(res => res.json())
+      .then(data => setDoctorName(data?.doctor_name || doctorPhone))
+      .catch(err => console.error("Failed to fetch doctor name:", err));
   }, [doctorPhone]);
 
   useEffect(() => {
-    const fetchChildInfo = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/chatbot/child/info/${childId}`);
-        const data = await res.json();
-        if (data?.name && data?.age && data?.gender) {
-          setChildInfo(data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch child info:", err);
-      }
-    };
-    fetchChildInfo();
+    fetch(`http://localhost:5000/chatbot/child/info/${childId}`)
+      .then(res => res.json())
+      .then(data => setChildInfo(data))
+      .catch(err => console.error("Failed to fetch child info:", err));
   }, [childId]);
 
   useEffect(() => {
     socket.emit("join_room", { room: roomId, user: doctorPhone });
 
     socket.on("receive_message", (data) => {
-      const formatted = {
+      setMessages(prev => [...prev, {
         ...data,
         timestamp: formatTimestamp(data.timestamp || new Date())
-      };
-      setMessages((prev) => [...prev, formatted]);
+      }]);
     });
 
     socket.on("system_message", (data) => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "System",
-          text: data.message,
-          timestamp: formatTimestamp(new Date())
-        }
-      ]);
+      setMessages(prev => [...prev, {
+        sender: "System",
+        text: data.message,
+        timestamp: formatTimestamp(new Date())
+      }]);
     });
 
     return () => {
@@ -92,20 +74,10 @@ function ParentChat() {
   }, [roomId, doctorPhone]);
 
   useEffect(() => {
-    const fetchMessages = async () => {
-      try {
-        const res = await fetch(`http://localhost:5001/messages/${roomId}`);
-        const data = await res.json();
-        const formattedMessages = data.map(msg => ({
-          ...msg,
-          timestamp: formatTimestamp(msg.timestamp)
-        }));
-        setMessages(formattedMessages);
-      } catch (err) {
-        console.error("Failed to load message history:", err);
-      }
-    };
-    fetchMessages();
+    fetch(`http://localhost:5001/messages/${roomId}`)
+      .then(res => res.json())
+      .then(data => setMessages(data.map(m => ({ ...m, timestamp: formatTimestamp(m.timestamp) }))))
+      .catch(err => console.error("Failed to load message history:", err));
   }, [roomId]);
 
   useEffect(() => {
@@ -117,11 +89,10 @@ function ParentChat() {
   const handleSend = () => {
     if (!input.trim()) return;
 
-    const timestamp = formatTimestamp(new Date());
     const messageData = {
       sender: doctorPhone,
       message: input,
-      timestamp,
+      timestamp: formatTimestamp(new Date()),
       room: roomId
     };
 
@@ -158,10 +129,10 @@ function ParentChat() {
             <span className="curve-app-title">Shishu Vriddhi</span>
           </div>
           <div className="curve-middle-section">
-            <span className="curve-text5">Chat with {parentName}</span>
+            <span className="curve-text5">{t.chatWith}</span>
           </div>
           <div className="curve-right-section">
-            <div className="child-info-line">Signed in as {doctorName}</div>
+            <div className="child-info-line">{t.signedInAs} {doctorName}</div>
           </div>
         </div>
       </div>
@@ -169,8 +140,8 @@ function ParentChat() {
       {/* Sidebar */}
       <div className="left-nav1">
         <ul>
-          <li onClick={() => navigate("/")}><IoMdHome size={35} />Home</li>
-          <li onClick={() => navigate("/signin")}><LogOut size={30} />Sign Out</li>
+          <li onClick={() => navigate("/")}><IoMdHome size={35} />{t.home}</li>
+          <li onClick={() => navigate("/signin",{ state: { lang: selectedLang } })}><LogOut size={30} />{t.signOut}</li>
         </ul>
       </div>
 
@@ -178,9 +149,9 @@ function ParentChat() {
       {childInfo && (
         <div className="fixed-child-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '10px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-            <span><strong>Child Name:</strong> {childInfo.name}</span>
-            <span><strong>Age:</strong> {childInfo.age}</span>
-            <span><strong>Gender:</strong> {childInfo.gender}</span>
+            <span><strong>{t.childName}:</strong> {childInfo.name}</span>
+            <span><strong>{t.age}:</strong> {childInfo.age}</span>
+            <span><strong>{t.gender}:</strong> {childInfo.gender}</span>
           </div>
         </div>
       )}
@@ -191,8 +162,7 @@ function ParentChat() {
           {messages.map((msg, idx) => (
             <div key={idx} className={msg.sender === doctorPhone ? "user-msg" : "bot-msg"}>
               <div className="avatar2">
-                {msg.sender === doctorPhone ? "🧑‍⚕️" :
-                  msg.sender === parentName ? "👩‍👧" : "👩‍👧"}
+                {msg.sender === doctorPhone ? "🧑‍⚕️" : "👩‍👧"}
               </div>
               <div className="message">
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -212,23 +182,22 @@ function ParentChat() {
 
         {/* Input */}
         <div className="input-row">
-        <input
-  type="text"
-  value={input}
-  onChange={(e) => setInput(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter" && input.trim()) {
-      e.preventDefault();
-      handleSend();
-    }
-  }}
-  placeholder="Type your message to the parent..."
-/>
-
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && input.trim()) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder={t.typeMessage}
+          />
           {!input.trim() ? (
             <button className="mic-button"><Mic /></button>
           ) : (
-            <button onClick={handleSend}>Send</button>
+            <button onClick={handleSend}>{t.send}</button>
           )}
         </div>
       </div>

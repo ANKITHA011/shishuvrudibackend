@@ -68,7 +68,6 @@ function SignUp() {
     const temp = {};
     if (!form.phone || !/^\d{10}$/.test(form.phone)) temp.phone = t.errors.invalidPhone;
     if (!form.parent_name.trim()) temp.parent_name = t.errors.nameRequired;
-    else if (!/^[a-zA-Z\s]{2,50}$/.test(form.parent_name)) temp.parent_name = t.errors.nameInvalid;
     if (!form.relation) temp.relation = t.errors.relationRequired;
     setErrors(temp);
     return Object.keys(temp).length === 0;

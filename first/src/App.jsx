@@ -15,6 +15,9 @@ import DocterList from"./code/DocterList";
 import DoctorChat from "./code/DoctorChat";
 import ParentChat from "./code/ParentChat";
 import DoctorDashboard from "./code/DoctorDashboard";
+import HeightForAgeChart from "./code/HeightForAgeChart"
+import GrowthGraphPage from "./code/GrowthGraphPage";
+
 function App() {
   return (
     <div className="App">
@@ -35,6 +38,8 @@ function App() {
           <Route path="/parentchat/:childId/:parentName/:doctorPhone" element={<ParentChat />} />
           <Route path="/signup-doctor" element={<DoctorSignUp />} />
           <Route path="/doctor-dashboard" element={<DoctorDashboard/>}/>
+          <Route path="/HeightForAgeChart" element={<HeightForAgeChart/>}/>
+          <Route path="/growth-graph" element={<GrowthGraphPage />} />
         </Routes>
       </BrowserRouter>
     </div>

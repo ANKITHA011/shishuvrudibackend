@@ -2,35 +2,48 @@ from flask import request, jsonify, Blueprint
 import re
 import traceback
 import mysql.connector
+from deep_translator import GoogleTranslator
 import google.generativeai as genai
 
-# Define your blueprint if not already
 milestone_bp = Blueprint('milestone', __name__)
-genai.configure(api_key="AIzaSyDO-nvH8fpcmru_FE61V9gpsU-nDOwaVko")
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
-# ✅ DB Connection helper
+
+# Configure Gemini model
+genai.configure(api_key="AIzaSyDt7Bfz1nvkLdCK4nogYtNg3kMBDB0xRlI")  # Replace with your valid API key
+model = genai.GenerativeModel("gemini-2.0-flash-lite")
+
 def get_db_connection():
     return mysql.connector.connect(
         host='localhost',
-        user='root',      # ⬅️ replace with actual MySQL username
-        password='root',  # ⬅️ replace with actual MySQL password
-        database='shishuvrridhhidb'   # ⬅️ replace with actual DB name
+        user='root',
+        password='root',
+        database='shishuvrridhhidb'
     )
+
+def translate_text(text, target_lang):
+    """
+    Translate English text into target_lang using GoogleTranslator.
+    Falls back to original if translation fails.
+    """
+    if not target_lang or target_lang == 'en':
+        return text
+    try:
+        return GoogleTranslator(source='en', target=target_lang).translate(text)
+    except Exception as e:
+        print(f"Translation failed: {e}")
+        return text
 
 @milestone_bp.route('/get_milestones', methods=['POST'])
 def get_milestones():
     try:
         data = request.json
-        if not data:
-            return jsonify({"error": "Missing or invalid JSON body"}), 400
-
         name = data.get("name")
         age = data.get("age")
         phone = data.get("phone")
         childid = data.get("childid")
+        language = data.get("language", "en")  # Default to English
 
         prompt = (
-            "You are a child development expert chatbot.\n"
+            f"You are a child development expert chatbot.\n"
             f"List 5 important developmental milestones for a {age}-month-old baby. "
             "For each one, write it as a short, clear and supportive question a pediatrician might ask a parent during a routine visit. "
             "Keep the language simple, warm, and easy to answer with 'Yes', 'No', or 'Don't Know'. "
@@ -39,27 +52,25 @@ def get_milestones():
 
         def clean_and_extract_question(line):
             line = re.sub(r'^\d+[\.\)]\s*', '', line)
-            line = re.sub(r'\*\*[^:*]+:\*\*', '', line)
             return line.strip(' "“”').strip()
 
-        print("Prompt sent to model:", prompt)
         response = model.generate_content(prompt)
-        print("Model response:", response)
-
         lines = response.text.strip().split('\n')
-        milestones = [clean_and_extract_question(line) for line in lines if '?' in line]
+        questions = [clean_and_extract_question(line) for line in lines if '?' in line]
+
+        translated = [translate_text(q, language) for q in questions]
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        for question in milestones:
+        for q in questions:
             cursor.execute("""
                 INSERT INTO tblmilestones (milstoneidchildid, milestonequestion, milestoneanswer, craeteddate)
                 VALUES (%s, %s, %s, NOW())
-            """, (childid, question, None))
+            """, (childid, q, None))
         conn.commit()
         conn.close()
 
-        return jsonify({"milestones": milestones})
+        return jsonify({"milestones": translated})
 
     except Exception as e:
         print("❌ Error in /get_milestones:")
@@ -74,20 +85,17 @@ def submit_milestones():
         answers = data.get("answers")
         name = data.get("name")
         age = data.get("age")
+        language = data.get("language", "en")  # <-- Get language from frontend
 
         conn = get_db_connection()
         cursor = conn.cursor()
-
-        # Insert new rows instead of update
         for item in answers:
             cursor.execute("""
                 INSERT INTO tblmilestones (milstoneidchildid, milestonequestion, milestoneanswer, craeteddate)
                 VALUES (%s, %s, %s, NOW())
             """, (childid, item["question"], item["answer"]))
-
         conn.commit()
 
-        # Now fetch all answers as you were doing before
         cursor.execute("""
             SELECT milestonequestion, milestoneanswer, craeteddate
             FROM tblmilestones
@@ -96,19 +104,18 @@ def submit_milestones():
         all_answers = cursor.fetchall()
         conn.close()
 
-        # Sort by date DESC and take only the most recent 5 answers
-        recent_answers = sorted(all_answers, key=lambda x: x[2], reverse=True)[:5]
-
-        summary = "\n".join([f"Q: {row[0]}\nA: {row[1]}" for row in recent_answers])
-        num_no = sum(1 for row in recent_answers if row[1].strip().lower() == "no")
-        num_dk = sum(1 for row in recent_answers if row[1].strip().lower() == "don't know")
+        recent = sorted(all_answers, key=lambda x: x[2], reverse=True)[:5]
+        num_no = sum(1 for row in recent if row[1].strip().lower() == "no")
+        num_dk = sum(1 for row in recent if row[1].strip().lower() == "don't know")
 
         if num_no == 0 and num_dk <= 1:
-            concern = "Your child appears to be developing normally for their age."
+            concern_en = "Your child appears to be developing normally for their age."
         elif num_no <= 2:
-            concern = "Your child may be slightly behind on some milestones. It’s okay to wait and watch, but if you're concerned, consult a pediatrician."
+            concern_en = "Your child may be slightly behind on some milestones. It’s okay to wait and watch, but if you're concerned, consult a pediatrician."
         else:
-            concern = "Several milestones were not met. It is recommended to consult a pediatrician for further evaluation."
+            concern_en = "Several milestones were not met. It is recommended to consult a pediatrician for further evaluation."
+
+        concern = translate_text(concern_en, language)
 
         full_summary = "\n".join([f"Q: {row[0]}\nA: {row[1]}" for row in all_answers])
         prompt = (
@@ -122,9 +129,9 @@ def submit_milestones():
             f"Recommendations:"
         )
 
-        print("Prompt to Gemini:\n", prompt)
         response = model.generate_content(prompt)
-        recommendations = response.text.strip()
+        recommendations_en = response.text.strip()
+        recommendations = translate_text(recommendations_en, language)
 
         return jsonify({
             "message": "Responses saved successfully.",
@@ -133,7 +140,7 @@ def submit_milestones():
         })
 
     except Exception as e:
-        print("Error in /submit_milestones:")
+        print("❌ Error in /submit_milestones:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -141,8 +148,6 @@ def submit_milestones():
 def get_milestone_responses():
     try:
         data = request.json
-        name = data.get("name")
-        phone = data.get("phone")
         childid = data.get("childid")
 
         conn = get_db_connection()
@@ -158,8 +163,7 @@ def get_milestone_responses():
 
         grouped = {}
         for row in rows:
-            q = row["milestonequestion"]
-            grouped.setdefault(q, []).append({
+            grouped.setdefault(row["milestonequestion"], []).append({
                 "answer": row["milestoneanswer"],
                 "timestamp": row["craeteddate"].strftime("%Y-%m-%d")
             })
@@ -167,6 +171,6 @@ def get_milestone_responses():
         return jsonify({"milestone_responses": grouped})
 
     except Exception as e:
-        print("Error in /get_milestone_responses:")
+        print("❌ Error in /get_milestone_responses:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

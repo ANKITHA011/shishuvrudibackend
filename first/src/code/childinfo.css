@@ -42,7 +42,7 @@ body {
 
 /* Sidebar */
 .sidebar {
-  width: 220px;
+  width: 300px;
   background: var(--background-light);
   color: white;
   display: flex;

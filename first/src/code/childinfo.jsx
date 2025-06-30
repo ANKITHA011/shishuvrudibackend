@@ -18,7 +18,7 @@ function ChildInfo() {
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [error, setError] = useState("");
-  
+
   const location = useLocation();
   const navigate = useNavigate();
   const dummyInputRef = useRef(null);
@@ -27,16 +27,14 @@ function ChildInfo() {
   const [region, setRegion] = useState("");
   const [country, setCountry] = useState("");
 
-  // Initialize language state
   const [language, setLanguage] = useState("en");
   const t = translations[language] || translations.en;
 
   useEffect(() => {
-    // Check for language in location state first, then localStorage
     const langFromLocation = location.state?.lang;
     const langFromStorage = localStorage.getItem("selectedLang");
     const lang = langFromLocation || langFromStorage || "en";
-    
+
     setLanguage(lang);
     localStorage.setItem("selectedLang", lang);
 
@@ -63,9 +61,9 @@ function ChildInfo() {
       }
     } else {
       setError(t.phoneNotFound);
-      setTimeout(() => navigate("/"), 2000);
+      setTimeout(() => navigate("/", { state: { lang: language } }), 2000);
     }
-  }, [navigate, t.phoneNotFound]);
+  }, [navigate, t.phoneNotFound, language]);
 
   const fetchChildren = useCallback(async (phoneNumber) => {
     if (!phoneNumber) return;
@@ -74,14 +72,14 @@ function ChildInfo() {
     setError("");
 
     try {
-      const response = await axios.post("http://localhost:5000/chatbot/children", { 
-        phone: phoneNumber 
+      const response = await axios.post("http://localhost:5000/chatbot/children", {
+        phone: phoneNumber,
       });
       setChildren(response.data);
       localStorage.setItem("childList", JSON.stringify(response.data));
 
       const initialVisibleActions = {};
-      response.data.forEach(child => {
+      response.data.forEach((child) => {
         initialVisibleActions[child.id] = false;
       });
       setVisibleActions(initialVisibleActions);
@@ -95,8 +93,8 @@ function ChildInfo() {
 
   const fetchParentName = useCallback(async (phoneNumber) => {
     try {
-      const res = await axios.post("http://localhost:5000/chatbot/get_parent_name", { 
-        phone: phoneNumber 
+      const res = await axios.post("http://localhost:5000/chatbot/get_parent_name", {
+        phone: phoneNumber,
       });
       if (res.data?.parent_name) {
         setParentName(res.data.parent_name);
@@ -132,7 +130,7 @@ function ChildInfo() {
       fetchChildren(phone);
       fetchParentName(phone);
     }
-  }, [phone, fetchChildren, fetchParentName, location]);
+  }, [phone, fetchChildren, fetchParentName]);
 
   useEffect(() => {
     fetchUserLocation();
@@ -148,7 +146,7 @@ function ChildInfo() {
   const startChat = (child) => {
     localStorage.removeItem("childInfo");
     localStorage.setItem("childInfo", JSON.stringify({ ...child, phone }));
-    navigate("/chatbot");
+    navigate("/chatbot", { state: { lang: language } });
   };
 
   const handleDelete = async (childId) => {
@@ -163,13 +161,13 @@ function ChildInfo() {
     }
   };
 
-  const goToNewEntry = () => navigate("/new-child");
+  const goToNewEntry = () => navigate("/new-child", { state: { lang: language } });
 
   const getGenderBadgeClass = (gender) => {
     const lowerGender = gender?.toLowerCase();
-    if (lowerGender === 'male') return 'gender-male';
-    if (lowerGender === 'female') return 'gender-female';
-    return 'gender-other';
+    if (lowerGender === "male") return "gender-male";
+    if (lowerGender === "female") return "gender-female";
+    return "gender-other";
   };
 
   return (
@@ -184,7 +182,7 @@ function ChildInfo() {
 
       <div className="sidebar">
         <ul>
-          <li onClick={() => navigate("/")} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <li onClick={() => navigate("/", { state: { lang: language } })} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <IoMdHome size={35} />{t.home}
           </li>
           <li onClick={goToNewEntry} style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -258,13 +256,13 @@ function ChildInfo() {
                               </button>
                               <button className="btn-milestone" onClick={() => {
                                 localStorage.setItem("childInfo", JSON.stringify(child));
-                                navigate("/milestone");
+                                navigate("/milestone", { state: { lang: language } });
                               }}>
                                 📊
                               </button>
                               <button className="btn-bmi" onClick={() => {
                                 localStorage.setItem("childInfo", JSON.stringify(child));
-                                navigate("/bmicheck");
+                                navigate("/bmicheck", { state: { lang: language } });
                               }}>
                                 📏
                               </button>

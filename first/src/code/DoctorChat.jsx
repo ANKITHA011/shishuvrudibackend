@@ -4,14 +4,19 @@ import { Volume2, Mic, LogOut } from "lucide-react";
 import { IoMdHome } from "react-icons/io";
 import { PiBabyBold } from "react-icons/pi";
 import { io } from "socket.io-client";
+import translations from "./translations5"; // Ensure this file has kn and en
 import './chat.css';
 
-const socket = io("http://localhost:5001"); // Assuming your Flask backend is also on localhost:5001, adjust if needed
+const socket = io("http://localhost:5001");
 
 function DoctorChat() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { childInfo: initialChildInfo, doctor } = location.state || {}; // Rename to initialChildInfo
+  const { childInfo: initialChildInfo, doctor, lang: routeLang } = location.state || {};
+
+  const [language, setLanguage] = useState("en");
+  const t = translations[language] || translations.en;
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -20,10 +25,15 @@ function DoctorChat() {
 
   const doctorActualName = doctor?.doctor_name || "";
   const doctorPhone = doctor?.phone_number || "defaultPhone";
-  const roomId = `${initialChildInfo?.id || 'no_child_id'}_${doctorPhone}`; // Handle case where initialChildInfo might be undefined
+  const roomId = `${initialChildInfo?.id || "no_child_id"}_${doctorPhone}`;
 
-  // State to store the fetched child details
   const [fetchedChildDetails, setFetchedChildDetails] = useState(null);
+
+  // Handle language from route/localStorage
+  useEffect(() => {
+    const savedLang = routeLang || localStorage.getItem("selectedLang") || "en";
+    setLanguage(savedLang);
+  }, [routeLang]);
 
   const resolveSenderName = (sender) => {
     if (sender === doctorPhone) return doctorActualName;
@@ -38,49 +48,55 @@ function DoctorChat() {
     const day = String(d.getDate()).padStart(2, '0');
     const hours = String(d.getHours()).padStart(2, '0');
     const minutes = String(d.getMinutes()).padStart(2, '0');
-    const seconds = String(d.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
-  // Effect to fetch child details
+  // Early error check
+  if (!initialChildInfo || !doctor) {
+    return (
+      <div style={{ padding: 20 }}>
+        <h2>Error: Missing doctor or child information.</h2>
+        <button onClick={() => navigate("/")}>{t.home}</button>
+      </div>
+    );
+  }
+
+  // Fetch child details
   useEffect(() => {
     const fetchChildDetails = async () => {
-      if (initialChildInfo && initialChildInfo.id) {
+      if (initialChildInfo?.id) {
         try {
-          // Construct the URL for the child info endpoint
-          const response = await fetch(`http://localhost:5000/chatbot/child/info/${initialChildInfo.id}`); // Assuming your Flask app runs on port 5001
-          if (!response.ok) {
-            if (response.status === 404) {
-              console.warn(`Child with ID ${initialChildInfo.id} not found.`);
-              setFetchedChildDetails(null); // Or set an error state
-            } else {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
+          const res = await fetch(`http://localhost:5000/chatbot/child/info/${initialChildInfo.id}`);
+          if (!res.ok) {
+            console.warn("Child not found");
+            setFetchedChildDetails(null);
+            return;
           }
-          const data = await response.json();
+          const data = await res.json();
           setFetchedChildDetails(data);
-        } catch (error) {
-          console.error("Error fetching child details:", error);
-          setFetchedChildDetails(null); // Clear previous details on error
+        } catch (err) {
+          console.error("Child details fetch error:", err);
+          setFetchedChildDetails(null);
         }
       }
     };
-
     fetchChildDetails();
-  }, [initialChildInfo]); // Re-run when initialChildInfo changes (e.g., if navigating with different child data)
+  }, [initialChildInfo]);
 
-  // Initial welcome message (now using fetchedChildDetails)
+  // Initial welcome message
   useEffect(() => {
     if (fetchedChildDetails && doctorActualName) {
       setMessages([{
         sender: doctorActualName,
-        text: `Hello, I'm ${doctorActualName}. How can I help you regarding ${fetchedChildDetails.name}?`,
+        text: typeof t.doctorWelcome === "function"
+          ? t.doctorWelcome(doctorActualName, fetchedChildDetails.name)
+          : `Hello, I'm ${doctorActualName}. How can I help you regarding ${fetchedChildDetails.name}?`,
         timestamp: formatTimestamp(new Date())
       }]);
     }
-  }, [fetchedChildDetails, doctorActualName]);
+  }, [fetchedChildDetails, doctorActualName, t]);
 
-
+  // Load old messages
   useEffect(() => {
     const fetchMessages = async () => {
       try {
@@ -92,12 +108,13 @@ function DoctorChat() {
         }));
         setMessages(formattedData);
       } catch (err) {
-        console.error("Error loading messages:", err);
+        console.error("Message fetch error:", err);
       }
     };
     fetchMessages();
   }, [roomId]);
 
+  // Socket handlers
   useEffect(() => {
     socket.emit("join_room", { room: roomId, user: currentParentName });
 
@@ -111,7 +128,7 @@ function DoctorChat() {
 
     socket.on("system_message", (data) => {
       setMessages(prev => [...prev, {
-        sender: "System",
+        sender: t.system || "System",
         text: data.message,
         timestamp: formatTimestamp(new Date())
       }]);
@@ -122,7 +139,7 @@ function DoctorChat() {
       socket.off("receive_message");
       socket.off("system_message");
     };
-  }, [roomId, currentParentName]);
+  }, [roomId, currentParentName, t.system]);
 
   useEffect(() => {
     if (chatWindowRef.current) {
@@ -139,7 +156,6 @@ function DoctorChat() {
 
   const handleSend = () => {
     if (!input.trim()) return;
-
     const timestamp = formatTimestamp(new Date());
     const messageData = {
       sender: currentParentName,
@@ -147,7 +163,6 @@ function DoctorChat() {
       timestamp,
       room: roomId
     };
-
     socket.emit("send_message", messageData);
     setInput("");
   };
@@ -168,37 +183,40 @@ function DoctorChat() {
             <span className="curve-app-title">Shishu Vriddhi</span>
           </div>
           <div className="curve-middle-section">
-            <span className="curve-text5">Chat with {doctorActualName}</span>
+            <span className="curve-text5">{t.chatWithDoctor}</span>
+            <div className="doctor-status">
+            <strong>{doctorActualName}</strong>
+            </div>
           </div>
           <div className="curve-right-section">
-            <div className="child-info-line">Signed in as {currentParentName}</div>
+            <div className="child-info-line">{t.signedInAs} {currentParentName}</div>
           </div>
         </div>
       </div>
 
-      {/* Sidebar Navigation */}
+      {/* Sidebar */}
       <div className="left-nav1">
         <ul>
-          <li onClick={() => navigate("/")}><IoMdHome size={35} />Home</li>
-          <li onClick={() => navigate("/child-info")}><PiBabyBold size={35} />Child Info</li>
-          <li onClick={() => navigate("/milestone")}>📊 Milestone</li>
-          <li onClick={() => navigate("/bmicheck")}>📏 CGM</li>
-          <li onClick={() => navigate("/signin")}><LogOut size={30} />Sign Out</li>
+          <li onClick={() => navigate("/")}><IoMdHome size={35} />{t.home}</li>
+          <li onClick={() => navigate("/child-info",{ state: { lang: language } })}><PiBabyBold size={35} />{t.childInfo}</li>
+          <li onClick={() => navigate("/milestone",{ state: { lang: language } })}>📊 {t.milestone}</li>
+          <li onClick={() => navigate("/bmicheck",{ state: { lang: language } })}>📏 {t.cgm}</li>
+          <li onClick={() => navigate("/signin", { state: { lang: language } })}><LogOut size={30} />{t.signOut}</li>
         </ul>
       </div>
 
-      {/* Display fetched child details */}
+      {/* Child Info */}
       {fetchedChildDetails && (
         <div className="fixed-child-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '10px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
-            <span><strong>Child Name:</strong> {fetchedChildDetails.name}</span>
-            <span><strong>Age:</strong> {fetchedChildDetails.age} </span>
-            <span><strong>Gender:</strong> {fetchedChildDetails.gender}</span>
+            <span><strong>{t.childName}:</strong> {fetchedChildDetails.name}</span>
+            <span><strong>{t.age}:</strong> {fetchedChildDetails.age}</span>
+            <span><strong>{t.gender}:</strong> {fetchedChildDetails.gender}</span>
           </div>
         </div>
       )}
 
-      {/* Main Chat Area */}
+      {/* Chat Window */}
       <div className="main-wrapper3">
         <div className="chat-window1" ref={chatWindowRef}>
           {messages.map((msg, idx) => (
@@ -213,7 +231,7 @@ function DoctorChat() {
               <div className="message">
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <strong>{resolveSenderName(msg.sender)}</strong>
-                  {msg.sender !== "System" && (
+                  {msg.sender !== t.system && (
                     <button className="speak-btn" onClick={() => handleSpeak(msg.text)}>
                       <Volume2 />
                     </button>
@@ -229,22 +247,23 @@ function DoctorChat() {
         {/* Input Field */}
         <div className="input-row">
           <input
-  type="text"
-  value={input}
-  onChange={e => setInput(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter" && input.trim()) {
-      e.preventDefault();
-      handleSend();
-    }
-  }}
-  placeholder={`Ask ${doctorActualName} a question...`}
-/>
-
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && input.trim()) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder={typeof t.askDoctorPlaceholder === "function"
+              ? t.askDoctorPlaceholder(doctorActualName)
+              : `Ask ${doctorActualName} a question...`}
+          />
           {!input.trim() ? (
-            <button className="mic-button"><Mic /></button>
+            <button className="mic-button" title={t.startRecording}><Mic /></button>
           ) : (
-            <button onClick={handleSend}>Send</button>
+            <button onClick={handleSend}>{t.send}</button>
           )}
         </div>
       </div>

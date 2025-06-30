@@ -1,16 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom'; // Import useLocation
+import { useNavigate, useLocation } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import './chatwithoutsignin.css';
-import { Volume2, Mic, FileText, FileJson, FileType, MessageSquareText, LogIn, MessageCircle, LayoutDashboard, Users, CreditCard, CalendarCheck, Settings, MoreVertical } from 'lucide-react'; // Import additional icons
+import { Volume2, Mic, FileText, FileJson, MessageCircle, LogIn } from 'lucide-react';
 import { FaArrowCircleDown, FaRegFilePdf } from "react-icons/fa";
 import { IoMdHome } from "react-icons/io";
 import { IoChatbubbleEllipsesSharp } from "react-icons/io5";
-import { FaUsers } from "react-icons/fa6"; // For the Create Teams icon
+import translations from './translations15';
 
 
-// Header component (Keep as is)
-const CurveHeader = () => (
+
+const optionIcons = {
+    'Download PDF': FaRegFilePdf,
+    'Download TXT': FileText,
+    'Download JSON': FileJson,
+    'Continue Chat': MessageCircle
+};
+
+// Header component (Modified to use translations)
+const CurveHeader = ({ t }) => (
     <div className="curve-separator5">
         <svg viewBox="0 0 500 80" preserveAspectRatio="none">
             <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
@@ -24,18 +32,11 @@ const CurveHeader = () => (
                 <span className="curve-app-title">Shishu Vriddhi</span>
             </div>
             <div className="curve-middle-section">
-                <span className="curve-text5">CHAT WITH ME</span>
+                <span className="curve-text5">{t('chatWithMe')}</span>
             </div>
         </div>
     </div>
 );
-
-const optionIcons = {
-    'Download PDF': FaRegFilePdf,
-    'Download TXT': FileText,
-    'Download JSON': FileJson,
-    'Continue Chat': MessageCircle
-};
 
 function Withoutsignin() {
     const [messages, setMessages] = useState([]);
@@ -45,10 +46,8 @@ function Withoutsignin() {
     const [hasStartedChat, setHasStartedChat] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const utteranceRef = useRef(null);
-    const [isRecording, setIsRecording] = useState(false);
-        const mediaRecorder = useRef(null);
-        const audioChunks = useRef([]);
-        const [state, setState] = useState({
+
+    const [state, setState] = useState({
         signedIn: null,
         age: '',
         mode: '',
@@ -58,7 +57,19 @@ function Withoutsignin() {
     const chatWindowRef = useRef(null);
     const inputRef = useRef(null);
     const navigate = useNavigate();
-    const location = useLocation(); // To get current path for active state
+    const location = useLocation();
+
+    // Get the language from navigation state, default to 'en'
+    const selectedLang = location.state?.lang || 'en';
+    const t = (key) => translations[selectedLang][key] || key; // Translation function
+
+    // Update optionIcons with translated keys
+    const localizedOptionIcons = {
+        [t('downloadPdf')]: FaRegFilePdf,
+        [t('downloadTxt')]: FileText,
+        [t('downloadJson')]: FileJson,
+        [t('continueChat')]: MessageCircle
+    };
 
     // State to manage active navigation item
     const [activeNavItem, setActiveNavItem] = useState('chat'); // Default active item
@@ -93,13 +104,13 @@ function Withoutsignin() {
     useEffect(() => {
         if (hasStartedChat) {
             setMessages([{
-                sender: 'Expert',
-                text: "Please enter your child’s age (e.g., 12 months):",
+                sender: t('expert'),
+                text: t('childsAgePrompt'),
                 timestamp: new Date().toLocaleString()
             }]);
             setState(prev => ({ ...prev, signedIn: false }));
         }
-    }, [hasStartedChat]);
+    }, [hasStartedChat, selectedLang]); // Added selectedLang dependency
 
     useEffect(() => {
         if (inputRef.current) inputRef.current.focus();
@@ -117,7 +128,7 @@ function Withoutsignin() {
         const utter = new SpeechSynthesisUtterance(text);
         utter.rate = 1;
         utter.pitch = 1;
-        utter.lang = 'en-US';
+        utter.lang = selectedLang === 'hi' ? 'hi-IN' : (selectedLang === 'kn' ? 'kn-IN' : 'en-US'); // Set language for speech
 
         utteranceRef.current = utter;
         setIsSpeaking(true);
@@ -127,74 +138,18 @@ function Withoutsignin() {
 
         synth.speak(utter);
     };
-        // NEW: Function to start recording audio
-    const startRecording = async () => {
-        if (isSpeaking) { // Stop any ongoing speech before recording
-            window.speechSynthesis.cancel();
-            setIsSpeaking(false);
-        }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder.current = new MediaRecorder(stream);
-            audioChunks.current = [];
-            mediaRecorder.current.ondataavailable = (event) => {
-                audioChunks.current.push(event.data);
-            };
-            mediaRecorder.current.onstop = async () => {
-                const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' }); // Use webm for broader compatibility
-                console.log("Audio recorded:", audioBlob);
-                // Send to backend for Whisper transcription
-                setLoading(true);
-                try {
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, 'recording.webm'); // Ensure correct filename and type
-                    const response = await axios.post("http://localhost:5000/chatbot/speech-to-text", formData, {
-                        headers: {
-                            'Content-Type': 'multipart/form-data',
-                        },
-                    });
-                    const transcribedText = response.data.text;
-                    if (transcribedText) {
-                        setInput(transcribedText); // Set the transcribed text into the input field
-                        // Optionally, auto-send the message if you want
-                        // handleSend(transcribedText);
-                    } else {
-                        addBotMessage("Could not transcribe audio. Please try again.", []);
-                    }
-                } catch (error) {
-                    console.error("Error sending audio to Whisper backend:", error);
-                    addBotMessage("Error processing speech. Please try typing your message.", []);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            mediaRecorder.current.start();
-            setIsRecording(true);
-            console.log("Recording started...");
-        } catch (error) {
-            console.error("Error accessing microphone:", error);
-            addBotMessage("Microphone access denied or an error occurred. Please ensure microphone permissions are granted.", []);
-        }
-    };
-    // NEW: Function to stop recording audio
-    const stopRecording = () => {
-        if (mediaRecorder.current && isRecording) {
-            mediaRecorder.current.stop();
-            setIsRecording(false);
-            console.log("Recording stopped.");
-        }
-    };
-    const handleMicButtonClick = () => {
-        if (isRecording) {
-            stopRecording();
-        } else {
-            startRecording();
-        }
-    };
-    
+
     const handleSpeechToText = () => {
         console.log("Speech-to-text button clicked");
+        // Implement speech-to-text logic here, potentially using Web Speech API
+        // You might need to set the recognition.lang based on selectedLang
     };
+    const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault(); // Prevent default behavior (like new line in textarea)
+        handleSend(); // Call your existing send function
+    }
+};
 
     const getStep = () => {
         if (!hasStartedChat) return 'welcome';
@@ -206,7 +161,7 @@ function Withoutsignin() {
 
     const addBotMessage = (text, options = []) => {
         const newMessage = {
-            sender: 'Expert',
+            sender: t('expert'),
             text,
             options,
             timestamp: new Date().toLocaleString()
@@ -223,7 +178,8 @@ function Withoutsignin() {
                 age,
                 mode,
                 session_id: state.sessionId,
-                conversation_history: history
+                conversation_history: history,
+                lang: selectedLang // Pass the language to the backend
             }),
         });
         return await res.json();
@@ -257,7 +213,7 @@ function Withoutsignin() {
         if (step === 'welcome') return;
 
         const newMessages = [...messages, {
-            sender: 'Parent',
+            sender: t('parent'),
             text: inputText,
             timestamp: new Date().toLocaleString()
         }];
@@ -266,25 +222,25 @@ function Withoutsignin() {
 
         const lowerInput = inputText.toLowerCase();
 
-        if (lowerInput.includes("download pdf")) {
+        if (lowerInput.includes(t('downloadPdf').toLowerCase())) {
             actualDownloadChat('pdf');
-            addBotMessage("Your chat history has been downloaded as a PDF. What would you like to do next?", ['Start New Chat', 'Continue Chat']);
+            addBotMessage(t('downloadedPdf'), [t('startNewChat'), t('continueChat')]);
             setLoading(false);
             return;
         }
-        if (lowerInput.includes("download txt")) {
+        if (lowerInput.includes(t('downloadTxt').toLowerCase())) {
             actualDownloadChat('txt');
-            addBotMessage("Your chat history has been downloaded as a TXT file. What would you like to do next?", ['Start New Chat', 'Continue Chat']);
+            addBotMessage(t('downloadedTxt'), [t('startNewChat'), t('continueChat')]);
             setLoading(false);
             return;
         }
-        if (lowerInput.includes("download json")) {
+        if (lowerInput.includes(t('downloadJson').toLowerCase())) {
             actualDownloadChat('json');
-            addBotMessage("Your chat history has been downloaded as a JSON file. What would you like to do next?", ['Start New Chat', 'Continue Chat']);
+            addBotMessage(t('downloadedJson'), [t('startNewChat'), t('continueChat')]);
             setLoading(false);
             return;
         }
-        if (lowerInput.includes("start new chat")) {
+        if (lowerInput.includes(t('startNewChat').toLowerCase())) {
             setMessages([]);
             setInput('');
             setChatEnded(false);
@@ -298,105 +254,109 @@ function Withoutsignin() {
             setLoading(false);
             return;
         }
-        if (lowerInput.includes("continue chat") && chatEnded) {
+        if (lowerInput.includes(t('continueChat').toLowerCase()) && chatEnded) {
             setChatEnded(false);
-            addBotMessage("Okay, what else can I help you with?");
+            addBotMessage(t('okayHelpNext'));
             setLoading(false);
             return;
         }
 
-        if (lowerInput.includes("milestone")) {
+        // Adjust for multilingual "milestone" check
+        const milestoneKeywords = ['milestone', t('milestone').toLowerCase(), t('getMilestoneRecommendations').toLowerCase()];
+        if (milestoneKeywords.some(keyword => lowerInput.includes(keyword))) {
             setState(prev => ({ ...prev, mode: 'recommend' }));
-            setActiveNavItem('milestones'); // Set active nav item
+            setActiveNavItem('milestones');
             const result = await sendToBackend('', state.age, 'recommend', newMessages);
-            addBotMessage(result?.response || "⚠️ Unexpected response format.", result.options || []);
+            addBotMessage(result?.response || t('unexpectedResponse'), result.options || []);
             setLoading(false);
             return;
         }
 
-        if (lowerInput.includes("chat") && !chatEnded) {
+        // Adjust for multilingual "chat" check
+        const chatKeywords = ['chat', t('chat').toLowerCase()];
+        if (chatKeywords.some(keyword => lowerInput.includes(keyword)) && !chatEnded) {
             setState(prev => ({ ...prev, mode: 'chat' }));
-            setActiveNavItem('chat'); // Set active nav item
-            addBotMessage("💬 Ask your question.");
+            setActiveNavItem('chat');
+            addBotMessage(t('askYourQuestion'));
             setLoading(false);
             return;
         }
 
         switch (step) {
             case 'signInChoice': {
-                const isSigningIn = lowerInput.includes('sign');
+                const isSigningIn = lowerInput.includes(t('signIn').toLowerCase());
                 setState(prev => ({ ...prev, signedIn: isSigningIn }));
                 if (!isSigningIn) {
-                    addBotMessage("⚠️ This conversation will not be saved unless you download it.");
+                    addBotMessage(t('chatSavedWarning'));
                 }
-                addBotMessage("Please enter your child’s age (e.g., 12 months or 2 years):");
+                addBotMessage(t('childsAgePrompt'));
                 break;
             }
 
             case 'askAge': {
                 const result = await sendToBackend('', inputText, 'chat', newMessages);
-                if (result?.response?.includes("⚠️")) {
+                if (result?.response?.includes("⚠️")) { // Still checking for a specific warning from backend
                     addBotMessage(result.response);
                     break;
                 }
                 setState(prev => ({ ...prev, age: inputText }));
-                addBotMessage("What would you like to do?", ['Continue Chat', '📊Get Milestone Recommendations']);
+                addBotMessage(t('whatDoYouWantToDo'), [t('continueChat'), t('getMilestoneRecommendations')]);
                 break;
             }
 
             case 'chooseMode': {
-                const mode = lowerInput.includes('chat') ? 'chat' : 'recommend';
+                const mode = chatKeywords.some(keyword => lowerInput.includes(keyword)) ? 'chat' : 'recommend';
                 setState(prev => ({ ...prev, mode }));
-                setActiveNavItem(mode === 'chat' ? 'chat' : 'milestones'); // Set active nav item
+                setActiveNavItem(mode === 'chat' ? 'chat' : 'milestones');
 
                 if (mode === 'recommend') {
                     const result = await sendToBackend('', state.age, 'recommend', []);
-                    addBotMessage(result?.response || "⚠️ Unexpected response format.", result.options || []);
+                    addBotMessage(result?.response || t('unexpectedResponse'), result.options || []);
                 } else {
-                    addBotMessage("Great! Ask your first question about your child.");
+                    addBotMessage(t('greatFirstQuestion'));
                 }
                 break;
             }
 
             case 'chatting': {
                 const result = await sendToBackend(inputText, state.age, state.mode, newMessages);
-                addBotMessage(result?.response || "⚠️ Unexpected response format.", result.options || []);
+                addBotMessage(result?.response || t('unexpectedResponse'), result.options || []);
                 if (state.mode === 'recommend' && !result.options) {
                     setState(prev => ({ ...prev, mode: '' }));
-                    setActiveNavItem('chat'); // Reset to chat if recommendations are done
-                    addBotMessage("What would you like to do next?", ['Continue Chat', '📊Get Milestone Recommendations']);
+                    setActiveNavItem('chat');
+                    addBotMessage(t('whatDoYouWantTo'), [t('continueChat'), t('getMilestoneRecommendations')]);
                 }
                 break;
             }
 
             default:
-                addBotMessage("Something went wrong. Please refresh.");
+                addBotMessage(t('somethingWentWrong'));
                 break;
         }
 
         setLoading(false);
     };
 
-    const handleSend = (messageToSend = input) => {
-        if (!messageToSend.trim()) return;
-        handleUserReply(messageToSend.trim());
+    const handleSend = () => {
+        if (!input.trim()) return;
+        handleUserReply(input.trim());
         setInput('');
     };
 
     const downloadChat = () => {
         setChatEnded(true);
-        setActiveNavItem('download'); // Set active nav item
-        addBotMessage("In Which format would you like to download?", ['Download PDF', 'Download TXT', 'Download JSON', 'Continue Chat']);
+        setActiveNavItem('download');
+        addBotMessage(t('downloadInFormat'), [t('downloadPdf'), t('downloadTxt'), t('downloadJson'), t('continueChat')]);
     };
 
     const WelcomeModal = () => (
         <div className="modal-overlay">
             <div className="modal-content">
-                <p>⚠️ This conversation will not be available for further reference unless you sign in or download it.</p>
-                <p>Do you want to sign in?</p>
+                <p>{t('conversationNotSaved')}</p>
+                <p>{t('signInPrompt')}</p>
                 <div className="options">
-                    <button onClick={() => { navigate("/signin", { state: { lang: 'en' } }); setActiveNavItem('signin'); }}>Sign In</button>
-                    <button onClick={() => setHasStartedChat(true)}>Continue Chat</button>
+                    <button onClick={() => { navigate("/signin", { state: { lang: selectedLang } }); setActiveNavItem('signin'); }}>{t('signIn')}</button>
+                    <button onClick={() => setHasStartedChat(true)}>{t('continueChat')}</button>
                 </div>
             </div>
         </div>
@@ -405,61 +365,56 @@ function Withoutsignin() {
     return (
         <>
             <div className="page-layout">
-                {/* Removed CurveHeader from here, as it's now inside main-wrapper2 */}
-
                 <div className="left-nav">
-
-                    {/* Navigation Buttons */}
                     <ul>
-                    <li onClick={() => navigate("/")}><IoMdHome size={35}/>Home</li>
-                    <li
-                        onClick={() => { navigate("/signin", { state: { lang: 'en' } }); setActiveNavItem('signin'); }}
-                        className={activeNavItem === 'signin' ? 'active' : ''}
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                    >
-                        <LogIn size={35} />Sign In
-                    </li>
-                    <li
-                        onClick={() => { handleUserReply('Continue Chat'); setActiveNavItem('chat'); }}
-                        className={`${!state.age ? 'disabled' : ''} ${activeNavItem === 'chat' ? 'active' : ''}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                    >
-                        <IoChatbubbleEllipsesSharp  size={35}/>Chat
-                    </li>
-                    <li
-                        onClick={() => { handleUserReply('Get Milestone Recommendations'); setActiveNavItem('milestones'); }}
-                        className={`${!state.age ? 'disabled' : ''} ${activeNavItem === 'milestones' ? 'active' : ''}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                    >
-                      <span style={{ fontSize: "1.5em" }}>📊</span>Milestone
-                    </li>
-                 </ul>
+                        <li onClick={() => navigate("/")}><IoMdHome size={35} />{t('home')}</li>
+                        <li
+                            onClick={() => { navigate("/signin", { state: { lang: selectedLang } }); setActiveNavItem('signin'); }}
+                            className={activeNavItem === 'signin' ? 'active' : ''}
+                            style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
+                        >
+                            <LogIn size={35} />{t('signIn')}
+                        </li>
+                        <li
+                            onClick={() => { handleUserReply(t('continueChat')); setActiveNavItem('chat'); }}
+                            className={`${!state.age ? 'disabled' : ''} ${activeNavItem === 'chat' ? 'active' : ''}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
+                        >
+                            <IoChatbubbleEllipsesSharp size={35} />{t('chat')}
+                        </li>
+                        <li
+                            onClick={() => { handleUserReply(t('getMilestoneRecommendations')); setActiveNavItem('milestones'); }}
+                            className={`${!state.age ? 'disabled' : ''} ${activeNavItem === 'milestones' ? 'active' : ''}`}
+                            style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
+                        >
+                            <span style={{ fontSize: "1.5em" }}>📊</span>{t('milestone')}
+                        </li>
+                    </ul>
                 </div>
-                 <CurveHeader />
-                 <div className="download-button-wrapper">
-    <button
-        className="download-btn-top"
-        onClick={downloadChat}
-        disabled={chatEnded || loading}
-    >
-        <FaArrowCircleDown style={{ marginRight: '8px' }} /> Download
-    </button>
-</div>
+                <CurveHeader t={t} /> {/* Pass translation function to Header */}
+                <div className="download-button-wrapper">
+                    <button
+                        className="download-btn-top"
+                        onClick={downloadChat}
+                        disabled={chatEnded || loading}
+                    >
+                        <FaArrowCircleDown style={{ marginRight: '8px' }} /> {t('download')}
+                    </button>
+                </div>
 
                 <div className="main-wrapper2">
-          
                     <div className="chat-heading-row">
-                        <h3 className="chat-heading">CHAT WITH ME</h3>
+                        <h3 className="chat-heading">{t('chatWithMe')}</h3>
                     </div>
                     <div className="chat-window1" ref={chatWindowRef}>
                         {messages.map((msg, i) => (
                             <div key={i}>
-                                <div className={msg.sender === 'Parent' ? 'user-msg' : 'bot-msg'}>
-                                    <div className="avatar2">{msg.sender === 'Parent' ? '👩‍👧' : '🧑‍⚕️'}</div>
+                                <div className={msg.sender === t('parent') ? 'user-msg' : 'bot-msg'}>
+                                    <div className="avatar2">{msg.sender === t('parent') ? '👩‍👧' : '🧑‍⚕️'}</div>
                                     <div className="message">
                                         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                                             <strong>{msg.sender}</strong>
-                                            <button className="speak-btn" onClick={() => handleSpeak(msg.text)} title={isSpeaking ? "Stop speaking" : "Speak"}>
+                                            <button className="speak-btn" onClick={() => handleSpeak(msg.text)} title={isSpeaking ? t('stopSpeaking') : t('speak')}>
                                                 <Volume2 color={isSpeaking ? 'black' : 'black'} />
                                             </button>
                                         </div>
@@ -470,7 +425,8 @@ function Withoutsignin() {
                                 {msg.options?.length > 0 && (
                                     <div className="options-buttons">
                                         {msg.options.map((opt, idx) => {
-                                            const IconComponent = optionIcons[opt];
+                                            // Use localizedOptionIcons here
+                                            const IconComponent = localizedOptionIcons[opt];
                                             return (
                                                 <button
                                                     key={idx}
@@ -486,45 +442,35 @@ function Withoutsignin() {
                                 )}
                             </div>
                         ))}
-                        {loading && <div className="typing">🧑‍⚕️ Expert is typing...</div>}
+                        {loading && <div className="typing">{t('expertIsTyping')}</div>}
                     </div>
 
                     {!chatEnded && (
                         <div className="input-row">
                             <input
-    ref={inputRef}
-    type="text"
-    value={input}
-    onChange={(e) => setInput(e.target.value)}
-    onKeyDown={(e) => {
-        if (e.key === 'Enter' && !loading && input.trim()) {
-            handleSend();
-        }
-    }}
-    placeholder="Ask a question about your child..."
-    disabled={loading|| isRecording}
-/>
-
+                                ref={inputRef}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyPress} 
+                                placeholder={t('typeYourMessage')}
+                                disabled={loading || messages[messages.length - 1]?.options?.length > 0}
+                            />
                             {!input.trim() ? (
-                               <button
-                                                           onClick={handleMicButtonClick}
-                                                           title={isRecording ? "Stop Recording" : "Start Recording"}
-                                                           className="mic-button"
-                                                           disabled={loading}
-                                                           style={{ backgroundColor: isRecording ? 'red' : 'transparent' }} // Visual feedback for recording
-                                                       >
-                                                           <Mic color={isRecording ? 'white' : 'black'} />
-                                                       </button>
+                                <button onClick={handleSpeechToText} title={t('speak')} className="mic-button" disabled={loading}>
+                                    <Mic />
+                                </button>
                             ) : (
-                                <button onClick={handleSend} disabled={loading || !input.trim()}>Send</button>
+                                <button onClick={handleSend} disabled={loading || !input.trim()}>
+                                    {t('send')}
+                                </button>
                             )}
                         </div>
                     )}
 
                     {chatEnded && (
                         <div className="end-chat">
-                            <button onClick={() => handleUserReply('Start New Chat')}>
-                                Start New Chat
+                            <button onClick={() => handleUserReply(t('startNewChat'))}>
+                                {t('startNewChat')}
                             </button>
                         </div>
                     )}
