@@ -5,6 +5,7 @@ import { IoMdHome } from "react-icons/io";
 import { io } from "socket.io-client";
 import translations from "./translations9";
 import './chat.css';
+import axios from 'axios';
 
 const socket = io("http://localhost:5001");
 
@@ -17,6 +18,11 @@ function ParentChat() {
   const [doctorName, setDoctorName] = useState("Doctor");
   const [childInfo, setChildInfo] = useState(null);
   const chatRef = useRef(null);
+
+  // Speech recognition state
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorder = useRef(null);
+  const audioChunks = useRef([]);
 
   const selectedLang = localStorage.getItem("selectedLang") || "en";
   const t = translations[selectedLang] || translations.en;
@@ -107,6 +113,75 @@ function ParentChat() {
     setIsSpeaking(true);
   };
 
+  // Speech recognition functions
+  const startRecording = async () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder.current = new MediaRecorder(stream);
+      audioChunks.current = [];
+      mediaRecorder.current.ondataavailable = (event) => {
+        audioChunks.current.push(event.data);
+      };
+      mediaRecorder.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
+        try {
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.webm');
+          const response = await axios.post("http://localhost:5000/speech/speech-to-text", formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          const transcribedText = response.data.text;
+          if (transcribedText) {
+            setInput(transcribedText);
+          } else {
+            setMessages(prev => [...prev, {
+              sender: "System",
+              text: t.transcriptionError || "Failed to transcribe audio",
+              timestamp: formatTimestamp(new Date())
+            }]);
+          }
+        } catch (error) {
+          console.error("Error sending audio to Whisper backend:", error);
+          setMessages(prev => [...prev, {
+            sender: "System",
+            text: t.audioProcessingError || "Error processing audio",
+            timestamp: formatTimestamp(new Date())
+          }]);
+        }
+      };
+      mediaRecorder.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      setMessages(prev => [...prev, {
+        sender: "System",
+        text: t.microphoneError || "Microphone access error",
+        timestamp: formatTimestamp(new Date())
+      }]);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleMicButtonClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   const resolveSenderName = (sender) => {
     if (sender === doctorPhone) return doctorName;
     if (sender === parentName) return parentName;
@@ -194,11 +269,14 @@ function ParentChat() {
             }}
             placeholder={t.typeMessage}
           />
-          {!input.trim() ? (
-            <button className="mic-button"><Mic /></button>
-          ) : (
-            <button onClick={handleSend}>{t.send}</button>
-          )}
+          <button
+            onClick={input.trim() ? handleSend : handleMicButtonClick}
+            className={input.trim() ? "send-button" : "mic-button"}
+            style={isRecording && !input.trim() ? { backgroundColor: 'red' } : {}}
+            title={input.trim() ? t.send : (isRecording ? t.stopRecording : t.startRecording)}
+          >
+            {input.trim() ? t.send : <Mic color={isRecording ? 'white' : 'black'} />}
+          </button>
         </div>
       </div>
     </div>

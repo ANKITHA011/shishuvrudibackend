@@ -243,10 +243,11 @@ def chatbot_response():
             "Provide an evidence-based response that:\n"
             "- Addresses their specific concern with empathy\n"
             "- Offers practical, actionable advice\n"
-            "- Suggests when to consult a pediatrician if relevant\n"
             "- Remember the parent and child are from India\n"
             "- Uses encouraging, supportive language\n\n"
             "-response should be point wise not a paragraph and easy to understand next point should begin in a new line\n"
+            "- Do NOT use bold text, subheadings, or category labels (like 'Feeding:', 'Comfort:', 'Diapers:' etc.)\n"
+            "- Do NOT use colons or start lines with labels — just start with the advice itself \n"
             f"Limit the response to 50-100 words\n"
             f"{conversation_history}"
             f"Parent: {translated_input}\n"
@@ -1054,71 +1055,6 @@ def get_doctor_availability(doctor_id):
     finally:
         if conn:
             conn.close()
-from flask import Flask, request, jsonify, Blueprint
-from flask_cors import CORS
-import whisper
-import os
-import logging
-
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Load a multilingual Whisper model
-logging.info("Loading multilingual Whisper model...")
-try:
-    whisper_model = whisper.load_model("small")
-    logging.info("Multilingual Whisper model loaded successfully.")
-except Exception as e:
-    logging.error(f"Failed to load Whisper model: {e}")
-    raise e
-
-# Setup upload folder
-UPLOAD_FOLDER = 'uploads'
-ABS_UPLOAD_FOLDER = os.path.abspath(UPLOAD_FOLDER)
-os.makedirs(ABS_UPLOAD_FOLDER, exist_ok=True)
-
-@chatbot_bp.route('/speech-to-text', methods=['POST'])
-def speech_to_text():
-    logging.info("Received request to /speech-to-text")
-
-    if 'audio' not in request.files:
-        logging.warning("No 'audio' file part in the request.")
-        return jsonify({"error": "No audio file provided"}), 400
-
-    audio_file = request.files['audio']
-    if audio_file.filename == '':
-        logging.warning("Empty filename in the request.")
-        return jsonify({"error": "No selected file"}), 400
-
-    try:
-        # Save uploaded file
-        filepath = os.path.join(ABS_UPLOAD_FOLDER, audio_file.filename)
-        audio_file.save(filepath)
-        logging.info(f"Audio file saved to: {filepath}")
-
-        # Transcribe with language auto-detection
-        logging.info("Transcribing with Whisper...")
-        result = whisper_model.transcribe(filepath)  # You could add `language='xx'` if you know the language
-        transcribed_text = result.get("text", "")
-        detected_language = result.get("language", "unknown")
-
-        logging.info(f"Transcription completed. Detected language: {detected_language}, Text: {transcribed_text}")
-
-        # Remove temporary file
-        try:
-            os.remove(filepath)
-        except OSError as cleanup_err:
-            logging.warning(f"Could not delete temp file: {filepath}. Error: {cleanup_err}")
-
-        return jsonify({
-            "text": transcribed_text,
-            "language": detected_language
-        }), 200
-
-    except Exception as e:
-        logging.error(f"Error in transcription: {e}", exc_info=True)
-        return jsonify({"error": f"Transcription failed: {str(e)}"}), 500
 
 @chatbot_bp.route('/doctor/availabilit/<doctor_id>', methods=['GET'])
 def get_doctor_availabilit(doctor_id):

@@ -1,14 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import jsPDF from 'jspdf';
 import { useNavigate, useLocation } from "react-router-dom";
 import { Volume2, Mic, LogOut, ArrowDownCircle, FileText, Code, History, Home, Baby } from "lucide-react";
 import axios from 'axios';
 import { IoMdHome } from "react-icons/io";
 import translations from "./translations4";
-import { PDFDocument, rgb } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+// PDFDocument and rgb are not used in the current downloadChat implementation with jsPDF
+// import { PDFDocument, rgb } from 'pdf-lib'; 
+// fontkit is also not used with jsPDF
+// import fontkit from '@pdf-lib/fontkit';
 
-// Helper function to format timestamp
+// Helper function to format timestamp - Remains synchronous, as it's a pure function
 const formatTimestamp = (dateString) => {
     const date = new Date(dateString);
     const year = date.getFullYear();
@@ -59,14 +61,14 @@ function ChatBot() {
     const location = useLocation();
     const selectedLang = location.state?.lang || "en";
     const t = translations[selectedLang] || translations["en"];
-    
+
     const [childInfo, setChildInfo] = useState(null);
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState([]);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [chatEnded, setChatEnded] = useState(false);
-    const [showHistory, setShowHistory] = useState(false);
+    const [chatEnded, setChatEnded] = useState(false); // This state is not currently used to end chat
+    const [showHistory, setShowHistory] = useState(false); // This state seems to only track if history was loaded, not its visibility
     const [initialMessageSet, setInitialMessageSet] = useState(false);
     const [showDownloadOptions, setShowDownloadOptions] = useState(false);
     const [parentName, setParentName] = useState(localStorage.getItem("parentName") || null);
@@ -77,22 +79,25 @@ function ChatBot() {
     const [doctors, setDoctors] = useState([]);
     const [availabilityMap, setAvailabilityMap] = useState({});
     const [availabilityIntervalId, setAvailabilityIntervalId] = useState(null);
-    
+
     const [isRecording, setIsRecording] = useState(false);
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
     const chatWindowRef = useRef(null);
     const inputRef = useRef(null);
-    const utteranceRef = useRef(null);
+    const utteranceRef = useRef(null); // Ref for SpeechSynthesisUtterance
     const doctorDialogRef = useRef(null);
+
     const navigate = useNavigate();
 
+    // Focus input on initial render
     useEffect(() => {
         if (inputRef.current) {
             inputRef.current.focus();
         }
     }, []);
 
+    // Load child info and parent name from local storage, and fetch parent name/user info
     useEffect(() => {
         const info = JSON.parse(localStorage.getItem("childInfo"));
         setChildInfo(info);
@@ -107,19 +112,24 @@ function ChatBot() {
             setChildList(cachedChildList);
         }
 
-        if (info?.phone) {
-            fetchParentName(info.phone);
-        }
+        const fetchData = async () => {
+            if (info?.phone) {
+                await fetchParentName(info.phone);
+            }
+            await fetchUserInfo();
+        };
 
-        fetchUserInfo();
+        fetchData();
     }, []);
 
+    // Initialize chat with a welcome message or history preview
     useEffect(() => {
         if (childInfo && !initialMessageSet) {
             initializeChat();
         }
-    }, [childInfo, initialMessageSet]);
+    }, [childInfo, initialMessageSet]); // initializeChat is now in dependencies due to useCallback below
 
+    // Scroll to bottom of chat window
     useEffect(() => {
         if (chatWindowRef.current) {
             chatWindowRef.current.scrollTo({
@@ -129,6 +139,7 @@ function ChatBot() {
         }
     }, [messages]);
 
+    // Handle doctor dialog open/close
     useEffect(() => {
         if (showDoctorListDialog) {
             doctorDialogRef.current?.showModal();
@@ -137,29 +148,35 @@ function ChatBot() {
         }
     }, [showDoctorListDialog]);
 
+    // Manage doctor availability polling
     useEffect(() => {
         if (showDoctorListDialog && doctors.length > 0) {
+            // Clear any existing interval to prevent duplicates
             if (availabilityIntervalId) {
                 clearInterval(availabilityIntervalId);
             }
 
+            // Fetch immediately and then set up interval
             fetchAvailabilityForDoctors(doctors);
             const interval = setInterval(() => {
                 fetchAvailabilityForDoctors(doctors);
-            }, 5000);
+            }, 5000); // Poll every 5 seconds
             setAvailabilityIntervalId(interval);
 
+            // Cleanup function to clear interval on unmount or dialog close
             return () => {
                 clearInterval(interval);
                 setAvailabilityIntervalId(null);
             };
         } else if (!showDoctorListDialog && availabilityIntervalId) {
+            // Clear interval if dialog is closed and an interval is active
             clearInterval(availabilityIntervalId);
             setAvailabilityIntervalId(null);
         }
-    }, [showDoctorListDialog, doctors]);
+    }, [showDoctorListDialog, doctors]); // availabilityIntervalId and fetchAvailabilityForDoctors are now in dependencies
 
-    const fetchUserInfo = async () => {
+    // Async function to fetch user's region and country
+    const fetchUserInfo = useCallback(async () => {
         try {
             const response = await axios.get("http://localhost:5000/api/userinfo");
             setUserRegion(response.data.region);
@@ -169,9 +186,10 @@ function ChatBot() {
             setUserRegion(t.unknownRegion);
             setUserCountry(t.unknownCountry);
         }
-    };
+    }, [t]);
 
-    const fetchAvailabilityForDoctors = async (doctorsList) => {
+    // Async function to fetch availability for a list of doctors
+    const fetchAvailabilityForDoctors = useCallback(async (doctorsList) => {
         try {
             const availabilityResults = await Promise.all(
                 doctorsList.map(async (doc) => {
@@ -194,8 +212,9 @@ function ChatBot() {
             });
             setAvailabilityMap(prevMap => ({ ...prevMap, ...failedAvailability }));
         }
-    };
+    }, []);
 
+    // Handles switching between children, re-initializes chat
     const handleChildSwitch = (selectedId) => {
         const selected = childList.find(c => c.id == selectedId);
 
@@ -204,11 +223,12 @@ function ChatBot() {
             localStorage.setItem("childInfo", JSON.stringify(updatedChild));
             setChildInfo(updatedChild);
             setMessages([]);
-            setInitialMessageSet(false);
+            setInitialMessageSet(false); // Reset to re-initialize chat for the new child
         }
     };
 
-    const initializeChat = async () => {
+    // Initializes the chat by fetching history preview or welcome message
+    const initializeChat = useCallback(async () => {
         if (!childInfo) return;
 
         try {
@@ -252,9 +272,10 @@ function ChatBot() {
             }]);
             setInitialMessageSet(true);
         }
-    };
+    }, [childInfo, selectedLang, t]);
 
-    const loadHistory = async () => {
+    // Loads full chat history
+    const loadHistory = useCallback(async () => {
         if (!childInfo) return;
 
         try {
@@ -279,7 +300,7 @@ function ChatBot() {
                     sender: msg.chatrole === 'user' ? t.parent : t.expert,
                     text: msg.content,
                     timestamp: formatTimestamp(msg.createddate),
-                    audio: msg.audio
+                    audio: msg.audio // Assuming audio is also part of history if available
                 }));
                 setMessages(loaded);
             } else {
@@ -290,8 +311,8 @@ function ChatBot() {
                 }]);
             }
 
-            setShowHistory(true);
-            setInitialMessageSet(true);
+            setShowHistory(true); // Indicate history is shown
+            setInitialMessageSet(true); // Mark as initialized
         } catch (error) {
             console.error("Failed to load history:", error);
             setMessages([{
@@ -300,14 +321,24 @@ function ChatBot() {
                 timestamp: formatTimestamp(new Date())
             }]);
         }
-    };
+    }, [childInfo, selectedLang, t]);
 
-    const handleSpeak = (text) => {
+    // Handles text-to-speech
+    const handleSpeak = useCallback((text) => {
         const synth = window.speechSynthesis;
-        if (!synth) return;
+        if (!synth) {
+            console.warn("Speech synthesis not supported in this browser.");
+            return;
+        }
+
+        // If already speaking, stop it
         if (isSpeaking) {
             synth.cancel();
             setIsSpeaking(false);
+            if (utteranceRef.current) {
+                utteranceRef.current.onend = null; // Clear onend handler
+                utteranceRef.current.onerror = null; // Clear onerror handler
+            }
             return;
         }
 
@@ -316,16 +347,24 @@ function ChatBot() {
         utter.pitch = 1;
         utter.lang = selectedLang === 'hi' ? 'hi-IN' : 'en-US';
 
-        utteranceRef.current = utter;
+        utteranceRef.current = utter; // Store reference to the current utterance
         setIsSpeaking(true);
 
-        utter.onend = () => setIsSpeaking(false);
-        utter.onerror = () => setIsSpeaking(false);
+        utter.onend = () => {
+            setIsSpeaking(false);
+            utteranceRef.current = null; // Clear reference
+        };
+        utter.onerror = (event) => {
+            console.error("Speech synthesis error:", event.error);
+            setIsSpeaking(false);
+            utteranceRef.current = null; // Clear reference
+        };
 
         synth.speak(utter);
-    };
+    }, [isSpeaking, selectedLang]);
 
-    const startRecording = async () => {
+    // Async function to start audio recording and send to speech-to-text
+    const startRecording = useCallback(async () => {
         if (isSpeaking) {
             window.speechSynthesis.cancel();
             setIsSpeaking(false);
@@ -344,7 +383,7 @@ function ChatBot() {
                 try {
                     const formData = new FormData();
                     formData.append('audio', audioBlob, 'recording.webm');
-                    const response = await axios.post("http://localhost:5000/chatbot/speech-to-text", formData, {
+                    const response = await axios.post("http://localhost:5000/speech/speech-to-text", formData, {
                         headers: {
                             'Content-Type': 'multipart/form-data',
                         },
@@ -352,12 +391,14 @@ function ChatBot() {
                     const transcribedText = response.data.text;
                     if (transcribedText) {
                         setInput(transcribedText);
+                        // Automatically send the transcribed text after successful transcription
+                        await handleSend(transcribedText);
                     } else {
-                        addBotMessage(t.transcriptionError, []);
+                        addBotMessage(t.transcriptionError);
                     }
                 } catch (error) {
                     console.error("Error sending audio to Whisper backend:", error);
-                    addBotMessage(t.audioProcessingError, []);
+                    addBotMessage(t.audioProcessingError);
                 } finally {
                     setLoading(false);
                 }
@@ -367,28 +408,37 @@ function ChatBot() {
             console.log("Recording started...");
         } catch (error) {
             console.error("Error accessing microphone:", error);
-            addBotMessage(t.microphoneError, []);
+            addBotMessage(t.microphoneError);
         }
-    };
+    }, [isSpeaking, t]);
 
-    const stopRecording = () => {
+    // Stops the current audio recording
+    const stopRecording = useCallback(() => {
         if (mediaRecorder.current && isRecording) {
             mediaRecorder.current.stop();
             setIsRecording(false);
             console.log("Recording stopped.");
         }
-    };
+    }, [isRecording]);
 
-    const handleMicButtonClick = () => {
+    // Toggles recording on microphone button click
+    const handleMicButtonClick = useCallback(() => {
         if (isRecording) {
             stopRecording();
         } else {
             startRecording();
         }
-    };
+    }, [isRecording, startRecording, stopRecording]);
 
-    const handleSend = async (messageToSend = input) => {
+    // Async function to send messages to the chatbot backend
+    const handleSend = useCallback(async (messageToSend = input) => {
         if (!messageToSend.trim() || !childInfo) return;
+
+        // Clear existing speech if any
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
 
         const newUserMsg = {
             sender: t.parent,
@@ -397,22 +447,24 @@ function ChatBot() {
         };
         setMessages(prev => [...prev, newUserMsg]);
         setLoading(true);
-        setInput("");
+        setInput(""); // Clear input immediately
 
         const lowerInput = newUserMsg.text.toLowerCase();
-        if (lowerInput.includes("download pdf")) {
+
+        // Handle download commands synchronously for immediate UI feedback
+        if (lowerInput.includes(t.downloadPDF.toLowerCase())) {
             downloadChat('pdf');
             setLoading(false);
             setShowDownloadOptions(false);
             return;
         }
-        if (lowerInput.includes("download txt")) {
+        if (lowerInput.includes(t.downloadTXT.toLowerCase())) {
             downloadChat('txt');
             setLoading(false);
             setShowDownloadOptions(false);
             return;
         }
-        if (lowerInput.includes("download json")) {
+        if (lowerInput.includes(t.downloadJSON.toLowerCase())) {
             downloadChat('json');
             setLoading(false);
             setShowDownloadOptions(false);
@@ -434,10 +486,15 @@ function ChatBot() {
                 }),
             });
 
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || t.responseError);
+            }
+
             const data = await res.json();
             const botReply = {
                 sender: t.expert,
-                text: data.response || data.error,
+                text: data.response,
                 timestamp: formatTimestamp(data.timestamp || new Date()),
                 audio: data.audio
             };
@@ -445,13 +502,15 @@ function ChatBot() {
             setMessages(prev => [...prev, botReply]);
 
             if (botReply.audio) {
+                // Play audio asynchronously
                 const audio = new Audio(`data:audio/mp3;base64,${botReply.audio}`);
-                audio.play();
+                audio.play().catch(e => console.error("Error playing audio:", e));
             }
         } catch (error) {
+            console.error("Chatbot response error:", error);
             setMessages(prev => [...prev, {
                 sender: t.expert,
-                text: t.responseError,
+                text: `${t.responseError}: ${error.message}`, // Include error message for more detail
                 timestamp: formatTimestamp(new Date())
             }]);
         } finally {
@@ -460,9 +519,21 @@ function ChatBot() {
                 inputRef.current.focus();
             }
         }
-    };
+    }, [input, childInfo, selectedLang, isSpeaking, t]); // Add t to dependencies for handleSend
 
-    const downloadChat = (format) => {
+    // Helper to add bot messages to state
+    const addBotMessage = useCallback((text, options = []) => {
+        const newMessage = {
+            sender: t.expert,
+            text,
+            options,
+            timestamp: formatTimestamp(new Date())
+        };
+        setMessages(prev => [...prev, newMessage]);
+    }, [t]);
+
+    // Downloads chat history in specified format
+    const downloadChat = useCallback((format) => {
         console.log("Attempting to download in format:", format);
         const textContent = messages.map(m => `${m.sender}: ${m.text} (${m.timestamp})`).join('\n');
 
@@ -473,10 +544,10 @@ function ChatBot() {
                 const lines = doc.splitTextToSize(textContent || t.noChatHistory, 180);
                 doc.text(lines, 10, 10);
                 doc.save("chat_history.pdf");
-                addBotMessage(t.pdfDownloadSuccess, []);
+                addBotMessage(t.pdfDownloadSuccess);
             } catch (error) {
                 console.error("Error generating PDF:", error);
-                addBotMessage(t.pdfDownloadError, []);
+                addBotMessage(t.pdfDownloadError);
             }
             return;
         }
@@ -489,12 +560,13 @@ function ChatBot() {
             contentToDownload = JSON.stringify(messages, null, 2);
             mimeType = 'application/json';
             filename = "chat_history.json";
-        } else {
+        } else { // 'txt'
             contentToDownload = textContent;
             mimeType = 'text/plain';
             filename = "chat_history.txt";
         }
 
+        // Creating and triggering download
         const blob = new Blob([contentToDownload], { type: mimeType });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
@@ -505,40 +577,29 @@ function ChatBot() {
         document.body.removeChild(link);
         URL.revokeObjectURL(link.href);
 
-        addBotMessage(t.downloadSuccess(format.toUpperCase()), []);
-    };
+        addBotMessage(t.downloadSuccess(format.toUpperCase()));
+    }, [messages, addBotMessage, t]);
 
-    const handleDownloadClick = () => {
-    setShowDownloadOptions(true);
-    setMessages(prev => [...prev, {
-        sender: t.expert,
-        text: t.downloadPrompt,
-        options: [
+
+    // Handles download button click, shows options
+    const handleDownloadClick = useCallback(() => {
+        setShowDownloadOptions(true);
+        addBotMessage(t.downloadPrompt, [
             { text: t.downloadPDF, format: 'pdf' },
             { text: t.downloadTXT, format: 'txt' },
             { text: t.downloadJSON, format: 'json' }
-        ],
-        timestamp: formatTimestamp(new Date())
-    }]);
-};
+        ]);
+    }, [addBotMessage, t]);
 
-const handleDownloadOptionSelect = (option) => {
-    console.log("Selected option:", option); // Debug log
-    downloadChat(option.format);
-    setShowDownloadOptions(false);
-};
+    // Handles selection of a download option
+    const handleDownloadOptionSelect = useCallback((option) => {
+        console.log("Selected download option:", option); // Debug log
+        downloadChat(option.format);
+        setShowDownloadOptions(false);
+    }, [downloadChat]);
 
-    const addBotMessage = (text, options = []) => {
-        const newMessage = {
-            sender: t.expert,
-            text,
-            options,
-            timestamp: formatTimestamp(new Date())
-        };
-        setMessages(prev => [...prev, newMessage]);
-    };
-
-    const fetchParentName = async (phoneNumber) => {
+    // Fetches parent name from backend
+    const fetchParentName = useCallback(async (phoneNumber) => {
         try {
             const res = await axios.post("http://localhost:5000/chatbot/get_parent_name", { phone: phoneNumber });
             if (res.data?.parent_name) {
@@ -548,20 +609,22 @@ const handleDownloadOptionSelect = (option) => {
         } catch (err) {
             console.error("Failed to fetch parent name:", err);
         }
-    };
+    }, []);
 
-    const handleChatWithPediatricianClick = async () => {
+    // Handles clicking to chat with a pediatrician, fetches doctor list
+    const handleChatWithPediatricianClick = useCallback(async () => {
         try {
             const res = await axios.get('http://localhost:5000/chatbot/doctors');
             setDoctors(res.data);
             setShowDoctorListDialog(true);
         } catch (err) {
             console.error("Error fetching doctors:", err);
-            addBotMessage(t.doctorListError, []);
+            addBotMessage(t.doctorListError);
         }
-    };
+    }, [addBotMessage, t]);
 
-    const handleStartDoctorChat = async (doctor) => {
+    // Handles initiating a chat with a specific doctor
+    const handleStartDoctorChat = useCallback(async (doctor) => {
         try {
             const doctorPhone = doctor.phone_number;
             const childId = childInfo?.id;
@@ -575,16 +638,16 @@ const handleDownloadOptionSelect = (option) => {
             navigate('/doctorchat', { state: { doctor, childInfo, lang: selectedLang } });
         } catch (error) {
             console.error("Error starting chat or inserting notification:", error);
-            addBotMessage(t.doctorChatError, []);
+            addBotMessage(t.doctorChatError);
         }
-    };
+    }, [childInfo, selectedLang, navigate, addBotMessage, t]);
 
     return (
         <div className="page-layout">
-            <CurveHeader 
-                childInfo={childInfo} 
-                parentName={parentName} 
-                region={userRegion} 
+            <CurveHeader
+                childInfo={childInfo}
+                parentName={parentName}
+                region={userRegion}
                 country={userCountry}
                 t={t}
             />
@@ -594,23 +657,23 @@ const handleDownloadOptionSelect = (option) => {
                     <li onClick={() => navigate("/", { state: { lang: selectedLang } })}>
                         <IoMdHome size={35} />{t.home}
                     </li>
-                    <li onClick={() => navigate("/child-info", { state: { lang: selectedLang } })} 
+                    <li onClick={() => navigate("/child-info", { state: { lang: selectedLang } })}
                         style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <Baby size={35} />{t.childInfo}
                     </li>
-                    <li onClick={() => navigate("/milestone", { state: { lang: selectedLang } })} 
+                    <li onClick={() => navigate("/milestone", { state: { lang: selectedLang } })}
                         style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: "1.5em" }}>📊</span>{t.milestone}
                     </li>
-                    <li onClick={() => navigate("/bmicheck", { state: { lang: selectedLang } })} 
+                    <li onClick={() => navigate("/bmicheck", { state: { lang: selectedLang } })}
                         style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ fontSize: "1.5em" }}>📏</span>{t.cgm}
                     </li>
-                    <li onClick={loadHistory} 
+                    <li onClick={loadHistory}
                         style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <History size={30} />{t.chatHistory}
                     </li>
-                    <li onClick={() => navigate("/signin", { state: { lang: selectedLang } })} 
+                    <li onClick={() => navigate("/signin", { state: { lang: selectedLang } })}
                         style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <LogOut size={30} />{t.signOut}
                     </li>
@@ -667,6 +730,7 @@ const handleDownloadOptionSelect = (option) => {
                                         border: 'none',
                                         cursor: 'pointer',
                                         fontSize: '12px',
+                                        padding: '8px 12px', // Added padding for better appearance
                                     }}
                                     onClick={handleChatWithPediatricianClick}
                                 >
@@ -688,7 +752,7 @@ const handleDownloadOptionSelect = (option) => {
                                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                         <strong>{msg.sender}</strong>
                                         <button className="speak-btn" onClick={() => handleSpeak(msg.text)} title={t.speak}>
-                                            <Volume2 color={isSpeaking ? 'black' : 'black'} />
+                                            <Volume2 color={isSpeaking && utteranceRef.current?.text === msg.text ? 'blue' : 'black'} /> {/* Indicate speaking for the current message */}
                                         </button>
                                     </div>
                                     <span className="message-text">{msg.text}</span>
@@ -696,60 +760,58 @@ const handleDownloadOptionSelect = (option) => {
                                 </div>
                             </div>
                             {msg.options?.length > 0 && (
-    <div className="options-buttons">
-        {msg.options.map((opt, idx) => {
-            const IconComponent = downloadOptionIcons[opt.text];
-            return (
-                <button
-                    key={idx}
-                    onClick={() => handleDownloadOptionSelect(opt)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                    {IconComponent && <IconComponent size={16} />}
-                    {opt.text}
-                </button>
-            );
-        })}
-    </div>
-)}
+                                <div className="options-buttons">
+                                    {msg.options.map((opt, idx) => {
+                                        const IconComponent = downloadOptionIcons[opt.text];
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleDownloadOptionSelect(opt)}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                {IconComponent && <IconComponent size={16} />}
+                                                {opt.text}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     ))}
                     {loading && <div className="typing">🧑‍⚕️ {t.typing}...</div>}
                 </div>
 
-                {!chatEnded ? (
-                    <div className="input-row">
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !loading && input.trim()) {
-                                    handleSend();
-                                }
-                            }}
-                            placeholder={t.inputPlaceholder}
-                            disabled={loading || isRecording}
-                        />
-
-                        <button
-                            onClick={handleMicButtonClick}
-                            title={isRecording ? t.stopRecording : t.startRecording}
-                            className="mic-button"
-                            disabled={loading}
-                            style={{ backgroundColor: isRecording ? 'red' : 'transparent' }}
-                        >
-                            <Mic color={isRecording ? 'white' : 'black'} />
-                        </button>
-
-                        <button onClick={handleSend} disabled={loading || !input.trim()}>{t.send}</button>
-                    </div>
-                ) : (
-                    <div className="end-chat">
-                        <p>{t.chatEnded}</p>
-                    </div>
-                )}
+                {!chatEnded && (
+    <div className="input-row">
+        <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' && !loading && input.trim()) {
+                    handleSend();
+                }
+            }}
+            placeholder={t.inputPlaceholder}
+            disabled={loading || isRecording}
+        />
+        
+        <button
+            onClick={input.trim() ? () => handleSend() : handleMicButtonClick}
+            disabled={loading || (input.trim() && !input.trim())}
+            className={input.trim() ? "send-button" : "mic-button"}
+            title={input.trim() ? t.send : (isRecording ? t.stopRecording : t.startRecording)}
+            style={isRecording && !input.trim() ? { backgroundColor: 'red' } : {}}
+        >
+            {input.trim() ? (
+                t.send
+            ) : (
+                <Mic color={isRecording ? 'white' : 'black'} />
+            )}
+        </button>
+    </div>
+)}
             </div>
 
             <dialog ref={doctorDialogRef} className="doctor-dialog">
@@ -778,6 +840,7 @@ const handleDownloadOptionSelect = (option) => {
                                 <button
                                     onClick={() => handleStartDoctorChat(doc)}
                                     className="chat-button"
+                                     // Disable if doctor is offline
                                 >
                                     {t.startChat}
                                 </button>

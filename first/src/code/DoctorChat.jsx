@@ -1,11 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";  
 import { useLocation, useNavigate } from "react-router-dom";
 import { Volume2, Mic, LogOut } from "lucide-react";
 import { IoMdHome } from "react-icons/io";
 import { PiBabyBold } from "react-icons/pi";
 import { io } from "socket.io-client";
-import translations from "./translations5"; // Ensure this file has kn and en
+import translations from "./translations5";
 import './chat.css';
+import axios from 'axios';
 
 const socket = io("http://localhost:5001");
 
@@ -20,6 +21,8 @@ function DoctorChat() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [doctorOnline, setDoctorOnline] = useState(false); // ✅ NEW
+
   const chatWindowRef = useRef(null);
   const currentParentName = localStorage.getItem("parentName") || "Parent";
 
@@ -28,8 +31,11 @@ function DoctorChat() {
   const roomId = `${initialChildInfo?.id || "no_child_id"}_${doctorPhone}`;
 
   const [fetchedChildDetails, setFetchedChildDetails] = useState(null);
+  
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorder = useRef(null);
+  const audioChunks = useRef([]);
 
-  // Handle language from route/localStorage
   useEffect(() => {
     const savedLang = routeLang || localStorage.getItem("selectedLang") || "en";
     setLanguage(savedLang);
@@ -51,7 +57,6 @@ function DoctorChat() {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
-  // Early error check
   if (!initialChildInfo || !doctor) {
     return (
       <div style={{ padding: 20 }}>
@@ -61,14 +66,12 @@ function DoctorChat() {
     );
   }
 
-  // Fetch child details
   useEffect(() => {
     const fetchChildDetails = async () => {
       if (initialChildInfo?.id) {
         try {
           const res = await fetch(`http://localhost:5000/chatbot/child/info/${initialChildInfo.id}`);
           if (!res.ok) {
-            console.warn("Child not found");
             setFetchedChildDetails(null);
             return;
           }
@@ -83,7 +86,6 @@ function DoctorChat() {
     fetchChildDetails();
   }, [initialChildInfo]);
 
-  // Initial welcome message
   useEffect(() => {
     if (fetchedChildDetails && doctorActualName) {
       setMessages([{
@@ -96,7 +98,6 @@ function DoctorChat() {
     }
   }, [fetchedChildDetails, doctorActualName, t]);
 
-  // Load old messages
   useEffect(() => {
     const fetchMessages = async () => {
       try {
@@ -114,7 +115,6 @@ function DoctorChat() {
     fetchMessages();
   }, [roomId]);
 
-  // Socket handlers
   useEffect(() => {
     socket.emit("join_room", { room: roomId, user: currentParentName });
 
@@ -134,12 +134,19 @@ function DoctorChat() {
       }]);
     });
 
+    socket.on("user_status", (data) => {
+      if (data.user === doctorActualName || data.user === doctorPhone) {
+        setDoctorOnline(data.status === "online"); // ✅ NEW
+      }
+    });
+
     return () => {
       socket.emit("leave_room", { room: roomId, user: currentParentName });
       socket.off("receive_message");
       socket.off("system_message");
+      socket.off("user_status"); // ✅ NEW
     };
-  }, [roomId, currentParentName, t.system]);
+  }, [roomId, currentParentName, t.system, doctorActualName, doctorPhone]);
 
   useEffect(() => {
     if (chatWindowRef.current) {
@@ -167,9 +174,72 @@ function DoctorChat() {
     setInput("");
   };
 
+  const startRecording = async () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder.current = new MediaRecorder(stream);
+      audioChunks.current = [];
+      mediaRecorder.current.ondataavailable = (event) => {
+        audioChunks.current.push(event.data);
+      };
+      mediaRecorder.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
+        try {
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.webm');
+          const response = await axios.post("http://localhost:5000/speech/speech-to-text", formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          const transcribedText = response.data.text;
+          if (transcribedText) {
+            setInput(transcribedText);
+          } else {
+            setMessages(prev => [...prev, {
+              sender: t.system || "System",
+              text: t.transcriptionError || "Failed to transcribe audio",
+              timestamp: formatTimestamp(new Date())
+            }]);
+          }
+        } catch (error) {
+          setMessages(prev => [...prev, {
+            sender: t.system || "System",
+            text: t.audioProcessingError || "Error processing audio",
+            timestamp: formatTimestamp(new Date())
+          }]);
+        }
+      };
+      mediaRecorder.current.start();
+      setIsRecording(true);
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        sender: t.system || "System",
+        text: t.microphoneError || "Microphone access error",
+        timestamp: formatTimestamp(new Date())
+      }]);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleMicButtonClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
   return (
     <div className="page-layout">
-      {/* Header */}
       <div className="curve-separator5">
         <svg viewBox="0 0 500 80" preserveAspectRatio="none">
           <path d="M0,0 C200,160 400,0 500,80 L500,0 L0,0 Z" className="wave-wave-back5" />
@@ -185,7 +255,10 @@ function DoctorChat() {
           <div className="curve-middle-section">
             <span className="curve-text5">{t.chatWithDoctor}</span>
             <div className="doctor-status">
-            <strong>{doctorActualName}</strong>
+              <strong>{doctorActualName}</strong>
+              <span style={{ marginLeft: 10, color: doctorOnline ? 'green' : 'gray' }}>
+                ● {doctorOnline ? t.online || 'Online' : t.offline || 'Offline'}
+              </span>
             </div>
           </div>
           <div className="curve-right-section">
@@ -194,7 +267,6 @@ function DoctorChat() {
         </div>
       </div>
 
-      {/* Sidebar */}
       <div className="left-nav1">
         <ul>
           <li onClick={() => navigate("/")}><IoMdHome size={35} />{t.home}</li>
@@ -205,7 +277,6 @@ function DoctorChat() {
         </ul>
       </div>
 
-      {/* Child Info */}
       {fetchedChildDetails && (
         <div className="fixed-child-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '10px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '50px' }}>
@@ -216,7 +287,6 @@ function DoctorChat() {
         </div>
       )}
 
-      {/* Chat Window */}
       <div className="main-wrapper3">
         <div className="chat-window1" ref={chatWindowRef}>
           {messages.map((msg, idx) => (
@@ -244,7 +314,6 @@ function DoctorChat() {
           ))}
         </div>
 
-        {/* Input Field */}
         <div className="input-row">
           <input
             type="text"
@@ -260,11 +329,14 @@ function DoctorChat() {
               ? t.askDoctorPlaceholder(doctorActualName)
               : `Ask ${doctorActualName} a question...`}
           />
-          {!input.trim() ? (
-            <button className="mic-button" title={t.startRecording}><Mic /></button>
-          ) : (
-            <button onClick={handleSend}>{t.send}</button>
-          )}
+          <button
+            onClick={input.trim() ? handleSend : handleMicButtonClick}
+            className={input.trim() ? "send-button" : "mic-button"}
+            style={isRecording && !input.trim() ? { backgroundColor: 'red' } : {}}
+            title={input.trim() ? t.send : (isRecording ? t.stopRecording : t.startRecording)}
+          >
+            {input.trim() ? t.send : <Mic color={isRecording ? 'white' : 'black'} />}
+          </button>
         </div>
       </div>
     </div>

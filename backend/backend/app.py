@@ -10,6 +10,7 @@ from chatbot_module import chatbot_bp
 from chatwithoutsign import chat_without_signin_bp
 from milestone import milestone_bp
 from graph import graph_bp
+from speech_to_text import speech_to_text_bp
 
 # Flask App Initialization
 app = Flask(__name__)
@@ -31,6 +32,7 @@ app.register_blueprint(chatbot_bp, url_prefix="/chatbot")
 app.register_blueprint(chat_without_signin_bp)
 app.register_blueprint(milestone_bp, url_prefix="/milestone")
 app.register_blueprint(graph_bp,url_prefix="/graph")
+app.register_blueprint(speech_to_text_bp,url_prefix="/speech")
 # Region-to-language mapping
 REGION_LANGUAGE_MAP = {
     'Maharashtra': ('Marathi', 'mr'),

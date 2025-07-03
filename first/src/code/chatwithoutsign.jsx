@@ -7,8 +7,7 @@ import { FaArrowCircleDown, FaRegFilePdf } from "react-icons/fa";
 import { IoMdHome } from "react-icons/io";
 import { IoChatbubbleEllipsesSharp } from "react-icons/io5";
 import translations from './translations15';
-
-
+import axios from 'axios';
 
 const optionIcons = {
     'Download PDF': FaRegFilePdf,
@@ -46,6 +45,9 @@ function Withoutsignin() {
     const [hasStartedChat, setHasStartedChat] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const utteranceRef = useRef(null);
+    const [isRecording, setIsRecording] = useState(false);
+    const mediaRecorder = useRef(null);
+    const audioChunks = useRef([]);
 
     const [state, setState] = useState({
         signedIn: null,
@@ -85,7 +87,6 @@ function Withoutsignin() {
         }
     }, [location.pathname, hasStartedChat, state.mode]);
 
-
     useEffect(() => {
         if (chatWindowRef.current) {
             chatWindowRef.current.scrollTo({
@@ -116,40 +117,119 @@ function Withoutsignin() {
         if (inputRef.current) inputRef.current.focus();
     }, [hasStartedChat]);
 
-    const handleSpeak = (text) => {
-        const synth = window.speechSynthesis;
-        if (!synth) return;
-        if (isSpeaking) {
-            synth.cancel();
-            setIsSpeaking(false);
-            return;
+const handleSpeak = async (text) => {
+    if (!text) return;
+    setIsSpeaking(true);
+
+    try {
+        const response = await fetch("http://localhost:5000/speech/text-to-speech", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }) // corrected key
+        });
+
+        if (!response.ok) {
+            console.warn("TTS server failed. Falling back to browser TTS.");
+            throw new Error("TTS server error");
         }
 
-        const utter = new SpeechSynthesisUtterance(text);
-        utter.rate = 1;
-        utter.pitch = 1;
-        utter.lang = selectedLang === 'hi' ? 'hi-IN' : (selectedLang === 'kn' ? 'kn-IN' : 'en-US'); // Set language for speech
+        const audioBlob = await response.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        audio.onended = () => setIsSpeaking(false);
+        audio.play();
+    } catch (err) {
+        // Fallback to browser TTS
+        try {
+            const synth = window.speechSynthesis;
+            const utter = new SpeechSynthesisUtterance(text);
+            utter.lang = selectedLang === 'hi' ? 'hi-IN' : selectedLang === 'kn' ? 'kn-IN' : 'en-US';
+            utter.pitch = 1;
+            utter.rate = 1;
 
-        utteranceRef.current = utter;
-        setIsSpeaking(true);
+            utter.onend = () => setIsSpeaking(false);
+            utter.onerror = () => setIsSpeaking(false);
 
-        utter.onend = () => setIsSpeaking(false);
-        utter.onerror = () => setIsSpeaking(false);
-
-        synth.speak(utter);
-    };
-
-    const handleSpeechToText = () => {
-        console.log("Speech-to-text button clicked");
-        // Implement speech-to-text logic here, potentially using Web Speech API
-        // You might need to set the recognition.lang based on selectedLang
-    };
-    const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault(); // Prevent default behavior (like new line in textarea)
-        handleSend(); // Call your existing send function
+            utteranceRef.current = utter;
+            synth.speak(utter);
+        } catch (e) {
+            console.error("Both TTS methods failed:", e);
+            setIsSpeaking(false);
+        }
     }
 };
+
+
+    const startRecording = async () => {
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            setIsSpeaking(false);
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder.current = new MediaRecorder(stream);
+            audioChunks.current = [];
+            mediaRecorder.current.ondataavailable = (event) => {
+                audioChunks.current.push(event.data);
+            };
+            mediaRecorder.current.onstop = async () => {
+                const audioBlob = new Blob(audioChunks.current, { type: 'audio/webm' });
+                console.log("Audio recorded:", audioBlob);
+                setLoading(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'recording.webm');
+                    const response = await axios.post("http://localhost:5000/speech/speech-to-text", formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    });
+                    const transcribedText = response.data.text;
+                    if (transcribedText) {
+                        setInput(transcribedText);
+                        // Automatically send the transcribed text after successful transcription
+                        await handleSend(transcribedText);
+                    } else {
+                        addBotMessage(t('transcriptionError'));
+                    }
+                } catch (error) {
+                    console.error("Error sending audio to Whisper backend:", error);
+                    addBotMessage(t('audioProcessingError'));
+                } finally {
+                    setLoading(false);
+                }
+            };
+            mediaRecorder.current.start();
+            setIsRecording(true);
+            console.log("Recording started...");
+        } catch (error) {
+            console.error("Error accessing microphone:", error);
+            addBotMessage(t('microphoneError'));
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorder.current && isRecording) {
+            mediaRecorder.current.stop();
+            setIsRecording(false);
+            console.log("Recording stopped.");
+        }
+    };
+
+    const handleMicButtonClick = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    };
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    };
 
     const getStep = () => {
         if (!hasStartedChat) return 'welcome';
@@ -179,7 +259,7 @@ function Withoutsignin() {
                 mode,
                 session_id: state.sessionId,
                 conversation_history: history,
-                lang: selectedLang // Pass the language to the backend
+                lang: selectedLang
             }),
         });
         return await res.json();
@@ -261,7 +341,6 @@ function Withoutsignin() {
             return;
         }
 
-        // Adjust for multilingual "milestone" check
         const milestoneKeywords = ['milestone', t('milestone').toLowerCase(), t('getMilestoneRecommendations').toLowerCase()];
         if (milestoneKeywords.some(keyword => lowerInput.includes(keyword))) {
             setState(prev => ({ ...prev, mode: 'recommend' }));
@@ -272,7 +351,6 @@ function Withoutsignin() {
             return;
         }
 
-        // Adjust for multilingual "chat" check
         const chatKeywords = ['chat', t('chat').toLowerCase()];
         if (chatKeywords.some(keyword => lowerInput.includes(keyword)) && !chatEnded) {
             setState(prev => ({ ...prev, mode: 'chat' }));
@@ -295,7 +373,7 @@ function Withoutsignin() {
 
             case 'askAge': {
                 const result = await sendToBackend('', inputText, 'chat', newMessages);
-                if (result?.response?.includes("⚠️")) { // Still checking for a specific warning from backend
+                if (result?.response?.includes("⚠️")) {
                     addBotMessage(result.response);
                     break;
                 }
@@ -391,7 +469,7 @@ function Withoutsignin() {
                         </li>
                     </ul>
                 </div>
-                <CurveHeader t={t} /> {/* Pass translation function to Header */}
+                <CurveHeader t={t} />
                 <div className="download-button-wrapper">
                     <button
                         className="download-btn-top"
@@ -425,7 +503,6 @@ function Withoutsignin() {
                                 {msg.options?.length > 0 && (
                                     <div className="options-buttons">
                                         {msg.options.map((opt, idx) => {
-                                            // Use localizedOptionIcons here
                                             const IconComponent = localizedOptionIcons[opt];
                                             return (
                                                 <button
@@ -451,19 +528,19 @@ function Withoutsignin() {
                                 ref={inputRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyPress} 
+                                onKeyDown={handleKeyPress}
                                 placeholder={t('typeYourMessage')}
-                                disabled={loading || messages[messages.length - 1]?.options?.length > 0}
+                                disabled={loading || messages[messages.length - 1]?.options?.length > 0 || isRecording}
                             />
-                            {!input.trim() ? (
-                                <button onClick={handleSpeechToText} title={t('speak')} className="mic-button" disabled={loading}>
-                                    <Mic />
-                                </button>
-                            ) : (
-                                <button onClick={handleSend} disabled={loading || !input.trim()}>
-                                    {t('send')}
-                                </button>
-                            )}
+                            <button
+                                onClick={input.trim() ? handleSend : handleMicButtonClick}
+                                disabled={loading || (input.trim() && !input.trim())}
+                                className={input.trim() ? "send-button" : "mic-button"}
+                                title={input.trim() ? t('send') : (isRecording ? t('stopRecording') : t('startRecording'))}
+                                style={isRecording && !input.trim() ? { backgroundColor: 'red' } : {}}
+                            >
+                                {input.trim() ? t('send') : <Mic color={isRecording ? 'white' : 'black'} />}
+                            </button>
                         </div>
                     )}
 
